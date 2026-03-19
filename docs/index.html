@@ -113,8 +113,8 @@
 <span></span>
 <span><span class="co"># Naive (unweighted) estimate is biased</span></span>
 <span><span class="va">naive_ate</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">Y</span><span class="op">[</span><span class="va">dat</span><span class="op">$</span><span class="va">A</span> <span class="op">==</span> <span class="fl">1</span><span class="op">]</span><span class="op">)</span> <span class="op">-</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">Y</span><span class="op">[</span><span class="va">dat</span><span class="op">$</span><span class="va">A</span> <span class="op">==</span> <span class="fl">0</span><span class="op">]</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Naive ATE:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">naive_ate</span>, <span class="fl">4</span><span class="op">)</span>, <span class="st">" (true ATE = 0)\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Naive ATE: 0.9812  (true ATE = 0)</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">naive_ate</span>, <span class="fl">4</span><span class="op">)</span>  <span class="co"># true ATE = 0</span></span>
+<span><span class="co">#&gt; [1] 0.9812</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="fitting-the-model">Fitting the model<a class="anchor" aria-label="anchor" href="#fitting-the-model"></a>
@@ -256,10 +256,10 @@
 <span><span class="va">bal_forest</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/compute_balance.html">compute_balance</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">X</span>, <span class="va">dat</span><span class="op">$</span><span class="va">A</span>, <span class="va">fit</span><span class="op">$</span><span class="va">weights</span><span class="op">)</span></span>
 <span><span class="va">bal_ipw</span>    <span class="op">&lt;-</span> <span class="fu"><a href="reference/compute_balance.html">compute_balance</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">X</span>, <span class="va">dat</span><span class="op">$</span><span class="va">A</span>, <span class="va">ipw</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Forest balance max |SMD|:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">bal_forest</span><span class="op">$</span><span class="va">max_smd</span>, <span class="fl">4</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Forest balance max |SMD|: 0.0284</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"IPW balance max |SMD|:   "</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">bal_ipw</span><span class="op">$</span><span class="va">max_smd</span>, <span class="fl">4</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; IPW balance max |SMD|:    0.2508</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Forest balance"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">bal_forest</span><span class="op">$</span><span class="va">max_smd</span>, <span class="fl">4</span><span class="op">)</span>,</span>
+<span>  <span class="st">"IPW"</span>            <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">bal_ipw</span><span class="op">$</span><span class="va">max_smd</span>, <span class="fl">4</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Forest balance            IPW </span></span>
+<span><span class="co">#&gt;         0.0284         0.2508</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="lower-level-interface">Lower-level interface<a class="anchor" aria-label="anchor" href="#lower-level-interface"></a>
@@ -276,18 +276,18 @@
 <span><span class="va">leaf_mat</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/get_leaf_node_matrix.html">get_leaf_node_matrix</a></span><span class="op">(</span><span class="va">forest</span>, <span class="va">dat</span><span class="op">$</span><span class="va">X</span><span class="op">)</span></span>
 <span><span class="va">K</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/leaf_node_kernel.html">leaf_node_kernel</a></span><span class="op">(</span><span class="va">leaf_mat</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Leaf matrix:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">leaf_mat</span><span class="op">)</span>, <span class="st">"obs x"</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">ncol</a></span><span class="op">(</span><span class="va">leaf_mat</span><span class="op">)</span>, <span class="st">"trees\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Leaf matrix: 800 obs x 500 trees</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Kernel: "</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fl">100</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">K</span><span class="op">@</span><span class="va">x</span><span class="op">)</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/prod.html" class="external-link">prod</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">K</span><span class="op">)</span><span class="op">)</span>, <span class="fl">1</span><span class="op">)</span>, <span class="st">"% nonzero\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Kernel:  24.5 % nonzero</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">leaf_mat</span><span class="op">)</span>  <span class="co"># n x B</span></span>
+<span><span class="co">#&gt; [1] 800 500</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fl">100</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">K</span><span class="op">@</span><span class="va">x</span><span class="op">)</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/prod.html" class="external-link">prod</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">K</span><span class="op">)</span><span class="op">)</span>, <span class="fl">1</span><span class="op">)</span>  <span class="co"># % nonzero</span></span>
+<span><span class="co">#&gt; [1] 24.5</span></span>
 <span></span>
 <span><span class="co"># 3. Compute balancing weights</span></span>
 <span><span class="va">bal</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/kernel_balance.html">kernel_balance</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">A</span>, <span class="va">K</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">ate</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/weighted.mean.html" class="external-link">weighted.mean</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">Y</span><span class="op">[</span><span class="va">dat</span><span class="op">$</span><span class="va">A</span> <span class="op">==</span> <span class="fl">1</span><span class="op">]</span>, <span class="va">bal</span><span class="op">$</span><span class="va">weights</span><span class="op">[</span><span class="va">dat</span><span class="op">$</span><span class="va">A</span> <span class="op">==</span> <span class="fl">1</span><span class="op">]</span><span class="op">)</span> <span class="op">-</span></span>
 <span>       <span class="fu"><a href="https://rdrr.io/r/stats/weighted.mean.html" class="external-link">weighted.mean</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">Y</span><span class="op">[</span><span class="va">dat</span><span class="op">$</span><span class="va">A</span> <span class="op">==</span> <span class="fl">0</span><span class="op">]</span>, <span class="va">bal</span><span class="op">$</span><span class="va">weights</span><span class="op">[</span><span class="va">dat</span><span class="op">$</span><span class="va">A</span> <span class="op">==</span> <span class="fl">0</span><span class="op">]</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"ATE estimate:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">ate</span>, <span class="fl">4</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; ATE estimate: 0.1455</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">ate</span>, <span class="fl">4</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 0.1455</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">
@@ -305,10 +305,28 @@
 <span>  <span class="va">results</span><span class="op">[</span><span class="va">r</span>, <span class="st">"Naive"</span><span class="op">]</span>  <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">Y</span><span class="op">[</span><span class="va">dat</span><span class="op">$</span><span class="va">A</span> <span class="op">==</span> <span class="fl">1</span><span class="op">]</span><span class="op">)</span> <span class="op">-</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">Y</span><span class="op">[</span><span class="va">dat</span><span class="op">$</span><span class="va">A</span> <span class="op">==</span> <span class="fl">0</span><span class="op">]</span><span class="op">)</span></span>
 <span>  <span class="va">results</span><span class="op">[</span><span class="va">r</span>, <span class="st">"Forest"</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="va">fit</span><span class="op">$</span><span class="va">ate</span></span>
 <span><span class="op">}</span></span></code></pre></div>
-<div class="sourceCode" id="cb11"><pre class="sourceCode R"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="co">#&gt;                Bias       SD     RMSE</span></span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="co">#&gt; ------------------------------------</span></span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="co">#&gt; Naive        1.2055   0.2983   1.2419</span></span>
-<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="co">#&gt; Forest       0.0932   0.1428   0.1705</span></span></code></pre></div>
+<table class="table">
+<thead><tr>
+<th align="left">Method</th>
+<th align="right">Bias</th>
+<th align="right">SD</th>
+<th align="right">RMSE</th>
+</tr></thead>
+<tbody>
+<tr>
+<td align="left">Naive</td>
+<td align="right">1.2055</td>
+<td align="right">0.2983</td>
+<td align="right">1.2419</td>
+</tr>
+<tr>
+<td align="left">Forest</td>
+<td align="right">0.0932</td>
+<td align="right">0.1428</td>
+<td align="right">0.1705</td>
+</tr>
+</tbody>
+</table>
 <p><img src="reference/figures/README-sim-plot-1.png"><!-- --></p>
 </div>
 <div class="section level2">

@@ -80,8 +80,8 @@ dat <- simulate_data(n = 800, p = 10, ate = 0)
 
 # Naive (unweighted) estimate is biased
 naive_ate <- mean(dat$Y[dat$A == 1]) - mean(dat$Y[dat$A == 0])
-cat("Naive ATE:", round(naive_ate, 4), " (true ATE = 0)\n")
-#> Naive ATE: 0.9812  (true ATE = 0)
+round(naive_ate, 4)  # true ATE = 0
+#> [1] 0.9812
 ```
 
 ### Fitting the model
@@ -231,10 +231,10 @@ ipw <- ifelse(dat$A == 1, 1 / dat$propensity, 1 / (1 - dat$propensity))
 bal_forest <- compute_balance(dat$X, dat$A, fit$weights)
 bal_ipw    <- compute_balance(dat$X, dat$A, ipw)
 
-cat("Forest balance max |SMD|:", round(bal_forest$max_smd, 4), "\n")
-#> Forest balance max |SMD|: 0.0284
-cat("IPW balance max |SMD|:   ", round(bal_ipw$max_smd, 4), "\n")
-#> IPW balance max |SMD|:    0.2508
+c("Forest balance" = round(bal_forest$max_smd, 4),
+  "IPW"            = round(bal_ipw$max_smd, 4))
+#> Forest balance            IPW 
+#>         0.0284         0.2508
 ```
 
 ### Lower-level interface
@@ -252,18 +252,18 @@ forest <- multi_regression_forest(dat$X, scale(cbind(dat$A, dat$Y)),
 leaf_mat <- get_leaf_node_matrix(forest, dat$X)
 K <- leaf_node_kernel(leaf_mat)
 
-cat("Leaf matrix:", nrow(leaf_mat), "obs x", ncol(leaf_mat), "trees\n")
-#> Leaf matrix: 800 obs x 500 trees
-cat("Kernel: ", round(100 * length(K@x) / prod(dim(K)), 1), "% nonzero\n")
-#> Kernel:  24.5 % nonzero
+dim(leaf_mat)  # n x B
+#> [1] 800 500
+round(100 * length(K@x) / prod(dim(K)), 1)  # % nonzero
+#> [1] 24.5
 
 # 3. Compute balancing weights
 bal <- kernel_balance(dat$A, K)
 
 ate <- weighted.mean(dat$Y[dat$A == 1], bal$weights[dat$A == 1]) -
        weighted.mean(dat$Y[dat$A == 0], bal$weights[dat$A == 0])
-cat("ATE estimate:", round(ate, 4), "\n")
-#> ATE estimate: 0.1455
+round(ate, 4)
+#> [1] 0.1455
 ```
 
 ## Simulation study
@@ -284,10 +284,10 @@ for (r in seq_len(nreps)) {
 }
 ```
 
-    #>                Bias       SD     RMSE
-    #> ------------------------------------
-    #> Naive        1.2055   0.2983   1.2419
-    #> Forest       0.0932   0.1428   0.1705
+| Method |   Bias |     SD |   RMSE |
+|:-------|-------:|-------:|-------:|
+| Naive  | 1.2055 | 0.2983 | 1.2419 |
+| Forest | 0.0932 | 0.1428 | 0.1705 |
 
 ![](man/figures/README-sim-plot-1.png)<!-- -->
 

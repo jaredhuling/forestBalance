@@ -82,7 +82,7 @@ dat <- simulate_data(n = 800, p = 10, ate = 0)
 
 # Naive (unweighted) estimate is biased
 naive_ate <- mean(dat$Y[dat$A == 1]) - mean(dat$Y[dat$A == 0])
-cat("Naive ATE:", round(naive_ate, 4), " (true ATE = 0)\n")
+round(naive_ate, 4)  # true ATE = 0
 ```
 
 ### Fitting the model
@@ -135,8 +135,8 @@ ipw <- ifelse(dat$A == 1, 1 / dat$propensity, 1 / (1 - dat$propensity))
 bal_forest <- compute_balance(dat$X, dat$A, fit$weights)
 bal_ipw    <- compute_balance(dat$X, dat$A, ipw)
 
-cat("Forest balance max |SMD|:", round(bal_forest$max_smd, 4), "\n")
-cat("IPW balance max |SMD|:   ", round(bal_ipw$max_smd, 4), "\n")
+c("Forest balance" = round(bal_forest$max_smd, 4),
+  "IPW"            = round(bal_ipw$max_smd, 4))
 ```
 
 ### Lower-level interface
@@ -154,15 +154,15 @@ forest <- multi_regression_forest(dat$X, scale(cbind(dat$A, dat$Y)),
 leaf_mat <- get_leaf_node_matrix(forest, dat$X)
 K <- leaf_node_kernel(leaf_mat)
 
-cat("Leaf matrix:", nrow(leaf_mat), "obs x", ncol(leaf_mat), "trees\n")
-cat("Kernel: ", round(100 * length(K@x) / prod(dim(K)), 1), "% nonzero\n")
+dim(leaf_mat)  # n x B
+round(100 * length(K@x) / prod(dim(K)), 1)  # % nonzero
 
 # 3. Compute balancing weights
 bal <- kernel_balance(dat$A, K)
 
 ate <- weighted.mean(dat$Y[dat$A == 1], bal$weights[dat$A == 1]) -
        weighted.mean(dat$Y[dat$A == 0], bal$weights[dat$A == 0])
-cat("ATE estimate:", round(ate, 4), "\n")
+round(ate, 4)
 ```
 
 ## Simulation study
@@ -184,14 +184,13 @@ for (r in seq_len(nreps)) {
 ```
 
 ```{r sim-results, echo=FALSE}
-cat(sprintf("%-10s %8s %8s %8s\n", "", "Bias", "SD", "RMSE"))
-cat(strrep("-", 36), "\n")
-for (m in colnames(results)) {
-  bias <- mean(results[, m])
-  sdev <- sd(results[, m])
-  rmse <- sqrt(bias^2 + sdev^2)
-  cat(sprintf("%-10s %8.4f %8.4f %8.4f\n", m, bias, sdev, rmse))
-}
+stbl <- data.frame(
+  Method = colnames(results),
+  Bias   = round(colMeans(results), 4),
+  SD     = round(apply(results, 2, sd), 4),
+  RMSE   = round(sqrt(colMeans(results)^2 + apply(results, 2, var)), 4)
+)
+knitr::kable(stbl, row.names = FALSE)
 ```
 
 ```{r sim-plot, echo=FALSE, fig.height=3.5}
