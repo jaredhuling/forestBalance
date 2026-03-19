@@ -1,0 +1,20 @@
+<urlset xmlns = 'http://www.sitemaps.org/schemas/sitemap/0.9'>
+<url><loc>/404.html</loc></url>
+<url><loc>/articles/guide.html</loc></url>
+<url><loc>/articles/index.html</loc></url>
+<url><loc>/articles/performance.html</loc></url>
+<url><loc>/authors.html</loc></url>
+<url><loc>/index.html</loc></url>
+<url><loc>/reference/compute_balance.html</loc></url>
+<url><loc>/reference/forest_balance.html</loc></url>
+<url><loc>/reference/forest_kernel.html</loc></url>
+<url><loc>/reference/get_leaf_node_matrix.html</loc></url>
+<url><loc>/reference/index.html</loc></url>
+<url><loc>/reference/kernel_balance.html</loc></url>
+<url><loc>/reference/leaf_node_kernel.html</loc></url>
+<url><loc>/reference/leaf_node_kernel_Z.html</loc></url>
+<url><loc>/reference/print.forest_balance.html</loc></url>
+<url><loc>/reference/simulate_data.html</loc></url>
+<url><loc>/reference/summary.forest_balance.html</loc></url>
+</urlset>
+
