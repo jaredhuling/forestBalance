@@ -8,8 +8,7 @@ knitr::opts_chunk$set(
   fig.path = "man/figures/README-", fig.width = 7, fig.height = 4.5,
   collapse = TRUE, comment = "#>"
 )
-# Source package functions for rendering before installation
-for (f in sort(list.files("R", full.names = TRUE))) source(f)
+library(forestBalance)
 library(grf)
 library(Matrix)
 ```
@@ -44,7 +43,7 @@ devtools::install_github("jaredhuling/forestBalance")
 # library(forestBalance)
 
 # Simulate observational data with nonlinear confounding (true ATE = 0)
-set.seed(42)
+set.seed(123)
 dat <- simulate_data(n = 500, p = 10, ate = 0)
 
 # Estimate ATE with forest kernel energy balancing

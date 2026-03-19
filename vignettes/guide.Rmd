@@ -48,7 +48,7 @@ propensity score depends on $X_1$ through a Beta density, and the outcome
 depends nonlinearly on $X_1$, $X_2$, and $X_5$:
 
 ```{r data}
-set.seed(2024)
+set.seed(123)
 dat <- simulate_data(n = 800, p = 10, ate = 0)
 
 cat("True ATE:", dat$ate, "\n")

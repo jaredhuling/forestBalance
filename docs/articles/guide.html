@@ -108,13 +108,13 @@ through a Beta density, and the outcome depends nonlinearly on
 and
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>X</mi><mn>5</mn></msub><annotation encoding="application/x-tex">X_5</annotation></semantics></math>:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">2024</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span>
 <span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/simulate_data.html">simulate_data</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">800</span>, p <span class="op">=</span> <span class="fl">10</span>, ate <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"True ATE:"</span>, <span class="va">dat</span><span class="op">$</span><span class="va">ate</span>, <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; True ATE: 0</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Naive ATE:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">Y</span><span class="op">[</span><span class="va">dat</span><span class="op">$</span><span class="va">A</span> <span class="op">==</span> <span class="fl">1</span><span class="op">]</span><span class="op">)</span> <span class="op">-</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">Y</span><span class="op">[</span><span class="va">dat</span><span class="op">$</span><span class="va">A</span> <span class="op">==</span> <span class="fl">0</span><span class="op">]</span><span class="op">)</span>, <span class="fl">4</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Naive ATE: 1.5486</span></span></code></pre></div>
+<span><span class="co">#&gt; Naive ATE: 0.9812</span></span></code></pre></div>
 <p>The naive difference-in-means is badly biased because of
 confounding.</p>
 </div>
@@ -129,11 +129,11 @@ confounding.</p>
 <span><span class="va">fit_fb</span></span>
 <span><span class="co">#&gt; Forest Kernel Energy Balancing</span></span>
 <span><span class="co">#&gt; -------------------------------------------------- </span></span>
-<span><span class="co">#&gt;   n = 800  (n_treated = 299, n_control = 501)</span></span>
+<span><span class="co">#&gt;   n = 800  (n_treated = 275, n_control = 525)</span></span>
 <span><span class="co">#&gt;   Trees: 1000</span></span>
 <span><span class="co">#&gt;   Solver: direct</span></span>
-<span><span class="co">#&gt;   ATE estimate: 0.0988</span></span>
-<span><span class="co">#&gt;   ESS: treated = 217/299 (73%)   control = 348/501 (69%)</span></span>
+<span><span class="co">#&gt;   ATE estimate: 0.0388</span></span>
+<span><span class="co">#&gt;   ESS: treated = 191/275 (70%)   control = 394/525 (75%)</span></span>
 <span><span class="co">#&gt; -------------------------------------------------- </span></span>
 <span><span class="co">#&gt; Use summary() for covariate balance details.</span></span></code></pre></div>
 </div>
@@ -172,19 +172,19 @@ treated and control covariate distributions:</p>
 <tbody>
 <tr class="odd">
 <td align="left">Naive</td>
-<td align="right">1.5486</td>
+<td align="right">0.9812</td>
 </tr>
 <tr class="even">
 <td align="left">Entropy balancing</td>
-<td align="right">0.9078</td>
+<td align="right">0.8246</td>
 </tr>
 <tr class="odd">
 <td align="left">Energy balancing</td>
-<td align="right">0.8313</td>
+<td align="right">0.6277</td>
 </tr>
 <tr class="even">
 <td align="left">Forest balance</td>
-<td align="right">0.0988</td>
+<td align="right">0.0388</td>
 </tr>
 <tr class="odd">
 <td align="left">Truth</td>
@@ -213,54 +213,54 @@ confounding operates through the Beta density:</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit_fb</span>, X.trans <span class="op">=</span> <span class="va">X.nl</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Forest Kernel Energy Balancing</span></span>
 <span><span class="co">#&gt; ============================================================ </span></span>
-<span><span class="co">#&gt;   n = 800  (n_treated = 299, n_control = 501)</span></span>
+<span><span class="co">#&gt;   n = 800  (n_treated = 275, n_control = 525)</span></span>
 <span><span class="co">#&gt;   Trees: 1000</span></span>
-<span><span class="co">#&gt;   Kernel density: 28.7% nonzero</span></span>
+<span><span class="co">#&gt;   Kernel density: 29.0% nonzero</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;   ATE estimate: 0.0988</span></span>
+<span><span class="co">#&gt;   ATE estimate: 0.0388</span></span>
 <span><span class="co">#&gt; ============================================================ </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Covariate Balance (|SMD|)</span></span>
 <span><span class="co">#&gt; ------------------------------------------------------------ </span></span>
 <span><span class="co">#&gt;   Covariate     Unweighted      Weighted</span></span>
 <span><span class="co">#&gt;   ----------  ------------  ------------</span></span>
-<span><span class="co">#&gt;   X1              0.2476 *        0.0322</span></span>
-<span><span class="co">#&gt;   X2                0.0672        0.0109</span></span>
-<span><span class="co">#&gt;   X3                0.0185        0.0064</span></span>
-<span><span class="co">#&gt;   X4                0.0134        0.0247</span></span>
-<span><span class="co">#&gt;   X5                0.0332        0.0221</span></span>
-<span><span class="co">#&gt;   X6                0.0293        0.0171</span></span>
-<span><span class="co">#&gt;   X7              0.1569 *        0.0158</span></span>
-<span><span class="co">#&gt;   X8              0.1505 *        0.0159</span></span>
-<span><span class="co">#&gt;   X9                0.0032        0.0012</span></span>
-<span><span class="co">#&gt;   X10               0.0087        0.0178</span></span>
+<span><span class="co">#&gt;   X1              0.1668 *        0.0220</span></span>
+<span><span class="co">#&gt;   X2              0.2956 *        0.0086</span></span>
+<span><span class="co">#&gt;   X3                0.0277        0.0148</span></span>
+<span><span class="co">#&gt;   X4              0.1102 *        0.0242</span></span>
+<span><span class="co">#&gt;   X5                0.0430        0.0210</span></span>
+<span><span class="co">#&gt;   X6                0.0189        0.0055</span></span>
+<span><span class="co">#&gt;   X7                0.0945        0.0258</span></span>
+<span><span class="co">#&gt;   X8                0.0733        0.0033</span></span>
+<span><span class="co">#&gt;   X9                0.0332        0.0284</span></span>
+<span><span class="co">#&gt;   X10               0.0734        0.0055</span></span>
 <span><span class="co">#&gt;   ----------  ------------  ------------</span></span>
-<span><span class="co">#&gt;   Max |SMD|         0.2476        0.0322</span></span>
+<span><span class="co">#&gt;   Max |SMD|         0.2956        0.0284</span></span>
 <span><span class="co">#&gt;   (* indicates |SMD| &gt; 0.10)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Transformed Covariate Balance (|SMD|)</span></span>
 <span><span class="co">#&gt; ------------------------------------------------------------ </span></span>
 <span><span class="co">#&gt;   Transform     Unweighted      Weighted</span></span>
 <span><span class="co">#&gt;   ----------  ------------  ------------</span></span>
-<span><span class="co">#&gt;   X1^2            0.1986 *        0.0282</span></span>
-<span><span class="co">#&gt;   X2^2              0.0410        0.0679</span></span>
-<span><span class="co">#&gt;   X5^2              0.0206        0.0551</span></span>
-<span><span class="co">#&gt;   X1*X2             0.0192        0.0353</span></span>
-<span><span class="co">#&gt;   X1*X5             0.0286        0.0128</span></span>
-<span><span class="co">#&gt;   Beta(X1)        0.7198 *        0.0399</span></span>
-<span><span class="co">#&gt;   Beta(X5)          0.0206        0.0081</span></span>
+<span><span class="co">#&gt;   X1^2            0.2904 *        0.0259</span></span>
+<span><span class="co">#&gt;   X2^2              0.0941        0.0322</span></span>
+<span><span class="co">#&gt;   X5^2              0.0841        0.0694</span></span>
+<span><span class="co">#&gt;   X1*X2           0.1303 *        0.0144</span></span>
+<span><span class="co">#&gt;   X1*X5             0.0573        0.0582</span></span>
+<span><span class="co">#&gt;   Beta(X1)        0.6847 *        0.0347</span></span>
+<span><span class="co">#&gt;   Beta(X5)          0.0289        0.0138</span></span>
 <span><span class="co">#&gt;   ----------  ------------  ------------</span></span>
-<span><span class="co">#&gt;   Max |SMD|         0.7198        0.0679</span></span>
+<span><span class="co">#&gt;   Max |SMD|         0.6847        0.0694</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Effective Sample Size</span></span>
 <span><span class="co">#&gt; ------------------------------------------------------------ </span></span>
-<span><span class="co">#&gt;   Treated: 217 / 299  (73%)</span></span>
-<span><span class="co">#&gt;   Control: 348 / 501  (69%)</span></span>
+<span><span class="co">#&gt;   Treated: 191 / 275  (70%)</span></span>
+<span><span class="co">#&gt;   Control: 394 / 525  (75%)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Energy Distance</span></span>
 <span><span class="co">#&gt; ------------------------------------------------------------ </span></span>
-<span><span class="co">#&gt;   Unweighted: 0.0392</span></span>
-<span><span class="co">#&gt;   Weighted:   0.0133</span></span>
+<span><span class="co">#&gt;   Unweighted: 0.0486</span></span>
+<span><span class="co">#&gt;   Weighted:   0.0144</span></span>
 <span><span class="co">#&gt; ============================================================</span></span></code></pre></div>
 <p>We can use <code><a href="../reference/compute_balance.html">compute_balance()</a></code> to compare all methods on
 the same terms:</p>
@@ -288,31 +288,31 @@ the same terms:</p>
 <tbody>
 <tr class="odd">
 <td align="left">Unweighted</td>
-<td align="right">0.2476</td>
-<td align="right">0.7198</td>
+<td align="right">0.2956</td>
+<td align="right">0.6847</td>
 <td align="left">100%</td>
 <td align="left">100%</td>
 </tr>
 <tr class="even">
 <td align="left">Entropy balancing</td>
 <td align="right">0.0000</td>
-<td align="right">0.6706</td>
-<td align="left">95%</td>
+<td align="right">0.6213</td>
+<td align="left">93%</td>
 <td align="left">98%</td>
 </tr>
 <tr class="odd">
 <td align="left">Energy balancing</td>
-<td align="right">0.0064</td>
-<td align="right">0.5568</td>
+<td align="right">0.0074</td>
+<td align="right">0.4879</td>
+<td align="left">84%</td>
 <td align="left">87%</td>
-<td align="left">88%</td>
 </tr>
 <tr class="even">
 <td align="left">Forest balance</td>
-<td align="right">0.0322</td>
-<td align="right">0.0679</td>
-<td align="left">73%</td>
-<td align="left">69%</td>
+<td align="right">0.0284</td>
+<td align="right">0.0694</td>
+<td align="left">70%</td>
+<td align="left">75%</td>
 </tr>
 </tbody>
 </table>

@@ -58,7 +58,7 @@
 <p><code>forestBalance</code> estimates average treatment effects (ATE) by combining multivariate random forests with kernel energy balancing. A joint forest model of covariates, treatment, and outcome defines a proximity kernel that characterizes the confounding structure and emphasizes similarity of observations in terms of confounding. Distributional balancing weights are then obtained via a closed-form kernel energy distance solution. By construction, these balancing weights aim to balance the joint distribution of confounders specifically.</p>
 <p>The method is described in:</p>
 <blockquote>
-<p>De, B. and Huling, J. (2025). <em>Data adaptive covariate balancing for causal effect estimation for high dimensional data.</em> arXiv:2512.18069.</p>
+<p>De, S. and Huling, J.D. (2025). <em>Data adaptive covariate balancing for causal effect estimation for high dimensional data.</em> arXiv:2512.18069.</p>
 </blockquote>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
@@ -74,7 +74,7 @@
 <code class="sourceCode R"><span><span class="co"># library(forestBalance)</span></span>
 <span></span>
 <span><span class="co"># Simulate observational data with nonlinear confounding (true ATE = 0)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">42</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span>
 <span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/simulate_data.html">simulate_data</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">500</span>, p <span class="op">=</span> <span class="fl">10</span>, ate <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Estimate ATE with forest kernel energy balancing</span></span>
@@ -82,10 +82,11 @@
 <span><span class="va">fit</span></span>
 <span><span class="co">#&gt; Forest Kernel Energy Balancing</span></span>
 <span><span class="co">#&gt; -------------------------------------------------- </span></span>
-<span><span class="co">#&gt;   n = 500  (n_treated = 187, n_control = 313)</span></span>
+<span><span class="co">#&gt;   n = 500  (n_treated = 173, n_control = 327)</span></span>
 <span><span class="co">#&gt;   Trees: 1000</span></span>
-<span><span class="co">#&gt;   ATE estimate: -0.0720</span></span>
-<span><span class="co">#&gt;   ESS: treated = 128/187 (69%)   control = 219/313 (70%)</span></span>
+<span><span class="co">#&gt;   Solver: direct</span></span>
+<span><span class="co">#&gt;   ATE estimate: 0.0455</span></span>
+<span><span class="co">#&gt;   ESS: treated = 105/173 (61%)   control = 232/327 (71%)</span></span>
 <span><span class="co">#&gt; -------------------------------------------------- </span></span>
 <span><span class="co">#&gt; Use summary() for covariate balance details.</span></span></code></pre></div>
 </div>
@@ -131,6 +132,7 @@
 <span><span class="co">#&gt; -------------------------------------------------- </span></span>
 <span><span class="co">#&gt;   n = 800  (n_treated = 275, n_control = 525)</span></span>
 <span><span class="co">#&gt;   Trees: 1000</span></span>
+<span><span class="co">#&gt;   Solver: direct</span></span>
 <span><span class="co">#&gt;   ATE estimate: 0.0388</span></span>
 <span><span class="co">#&gt;   ESS: treated = 191/275 (70%)   control = 394/525 (75%)</span></span>
 <span><span class="co">#&gt; -------------------------------------------------- </span></span>

@@ -13,7 +13,7 @@ joint distribution of confounders specifically.
 
 The method is described in:
 
-> De, B. and Huling, J. (2025). *Data adaptive covariate balancing for
+> De, S. and Huling, J.D. (2025). *Data adaptive covariate balancing for
 > causal effect estimation for high dimensional data.* arXiv:2512.18069.
 
 ## Installation
@@ -29,7 +29,7 @@ devtools::install_github("jaredhuling/forestBalance")
 # library(forestBalance)
 
 # Simulate observational data with nonlinear confounding (true ATE = 0)
-set.seed(42)
+set.seed(123)
 dat <- simulate_data(n = 500, p = 10, ate = 0)
 
 # Estimate ATE with forest kernel energy balancing
@@ -37,10 +37,11 @@ fit <- forest_balance(dat$X, dat$A, dat$Y)
 fit
 #> Forest Kernel Energy Balancing
 #> -------------------------------------------------- 
-#>   n = 500  (n_treated = 187, n_control = 313)
+#>   n = 500  (n_treated = 173, n_control = 327)
 #>   Trees: 1000
-#>   ATE estimate: -0.0720
-#>   ESS: treated = 128/187 (69%)   control = 219/313 (70%)
+#>   Solver: direct
+#>   ATE estimate: 0.0455
+#>   ESS: treated = 105/173 (61%)   control = 232/327 (71%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
 ```
@@ -100,6 +101,7 @@ fit
 #> -------------------------------------------------- 
 #>   n = 800  (n_treated = 275, n_control = 525)
 #>   Trees: 1000
+#>   Solver: direct
 #>   ATE estimate: 0.0388
 #>   ESS: treated = 191/275 (70%)   control = 394/525 (75%)
 #> -------------------------------------------------- 
