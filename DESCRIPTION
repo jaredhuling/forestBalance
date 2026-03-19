@@ -10,15 +10,18 @@ Description: Estimates average treatment effects using kernel energy balancing
     models covariates, outcome, and treatment to build a similarity kernel
     between observations. This kernel is then used for energy balancing to create
     weights that control for confounding. The method is described in
-    De and Huling (2024) <doi:10.48550/arXiv.2512.18069>.
+    De and Huling (2025) <doi:10.48550/arXiv.2512.18069>.
 License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
+LinkingTo:
+    Rcpp
 Imports:
     grf (>= 2.3.0),
     MASS,
-    Matrix
+    Matrix,
+    Rcpp
 Suggests:
     osqp,
     testthat (>= 3.0.0)

@@ -28,12 +28,12 @@ trees in which observations \eqn{i} and \eqn{j} fall into the same leaf node.
 }
 \details{
 For each tree \eqn{b}, the leaf assignment defines a sparse \eqn{n \times
-L_b} indicator matrix \eqn{Z_b}. Rather than looping over trees, this
-function stacks all \eqn{B} indicator matrices column-wise into a single
-sparse matrix \eqn{Z = [Z_1 | Z_2 | \cdots | Z_B]} of dimension
+L_b} indicator matrix \eqn{Z_b}. This function stacks all \eqn{B} indicator
+matrices column-wise into a single sparse matrix
+\eqn{Z = [Z_1 | Z_2 | \cdots | Z_B]} of dimension
 \eqn{n \times \sum_b L_b}. The kernel is then obtained via a single sparse
-cross-product: \eqn{K = Z Z^\top / B}. This is efficient because \eqn{Z}
-has exactly \eqn{nB} nonzeros (one per observation per tree).
+cross-product: \eqn{K = Z Z^\top / B}. Leaf ID remapping is done in C++ for
+speed.
 }
 \examples{
 \donttest{

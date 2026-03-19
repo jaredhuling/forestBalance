@@ -18,12 +18,12 @@
 #'
 #' @details
 #' For each tree \eqn{b}, the leaf assignment defines a sparse \eqn{n \times
-#' L_b} indicator matrix \eqn{Z_b}. Rather than looping over trees, this
-#' function stacks all \eqn{B} indicator matrices column-wise into a single
-#' sparse matrix \eqn{Z = [Z_1 | Z_2 | \cdots | Z_B]} of dimension
+#' L_b} indicator matrix \eqn{Z_b}. This function stacks all \eqn{B} indicator
+#' matrices column-wise into a single sparse matrix
+#' \eqn{Z = [Z_1 | Z_2 | \cdots | Z_B]} of dimension
 #' \eqn{n \times \sum_b L_b}. The kernel is then obtained via a single sparse
-#' cross-product: \eqn{K = Z Z^\top / B}. This is efficient because \eqn{Z}
-#' has exactly \eqn{nB} nonzeros (one per observation per tree).
+#' cross-product: \eqn{K = Z Z^\top / B}. Leaf ID remapping is done in C++ for
+#' speed.
 #'
 #' @examples
 #' \donttest{
@@ -45,27 +45,19 @@ leaf_node_kernel <- function(leaf_matrix, sparse = TRUE) {
   n <- nrow(leaf_matrix)
   B <- ncol(leaf_matrix)
 
-  # Build one big sparse indicator matrix Z = [Z_1 | Z_2 | ... | Z_B]
-  # where Z_b is n x (number of leaves in tree b).
-  # Z has exactly n*B nonzeros: one entry per observation per tree.
-  row_idx <- rep(seq_len(n), times = B)
-  col_idx <- integer(n * B)
-  offset <- 0L
+  # Remap leaf IDs to consecutive integers with per-tree offsets (C++)
+  remapped <- remap_leaves_cpp(leaf_matrix)
+  total_cols <- max(remapped)
 
-  for (b in seq_len(B)) {
-    leaves <- leaf_matrix[, b]
-    # Map leaf IDs to consecutive 1..L_b integers
-    leaf_int <- match(leaves, unique(leaves))
-    rng <- ((b - 1L) * n + 1L):(b * n)
-    col_idx[rng] <- leaf_int + offset
-    offset <- offset + max(leaf_int)
-  }
+  # Build sparse indicator matrix Z: n rows, total_cols columns, n*B nonzeros
+  row_idx <- rep(seq_len(n), times = B)
+  col_idx <- as.integer(remapped)
 
   Z <- Matrix::sparseMatrix(
     i = row_idx,
     j = col_idx,
     x = 1,
-    dims = c(n, offset)
+    dims = c(n, total_cols)
   )
 
   # Single sparse tcrossprod: K = Z Z^T / B

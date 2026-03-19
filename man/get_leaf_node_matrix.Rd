@@ -23,19 +23,16 @@ An integer matrix of dimension \code{nrow(newdata)} by
 }
 \description{
 For each observation and each tree in a trained GRF forest, determines which
-leaf node the observation falls into. This function accesses the forest's
-internal tree structure directly, avoiding the overhead of
-\code{\link[grf]{get_tree}} and \code{\link[grf]{get_leaf_node}}, and
-vectorizes the tree traversal across all observations simultaneously.
+leaf node the observation falls into. The tree traversal is implemented in
+C++ for speed, directly reading the forest's internal tree structure and
+avoiding the overhead of \code{\link[grf]{get_tree}} and
+\code{\link[grf]{get_leaf_node}}.
 }
 \details{
 This function reads the internal tree vectors stored in a GRF forest object
 (\code{_child_nodes}, \code{_split_vars}, \code{_split_values},
-\code{_root_nodes}, \code{_send_missing_left}) and traverses each tree in a
-vectorized fashion. All \eqn{n} observations are moved through the tree
-simultaneously at each depth level, resulting in \eqn{O(d)} vectorized
-operations per tree, where \eqn{d} is the tree depth (typically
-\eqn{\sim \log n}). This is dramatically faster than the per-observation
+\code{_root_nodes}, \code{_send_missing_left}) and traverses each tree in
+compiled C++ code. This is dramatically faster than the per-observation
 R-level loop in \code{grf::get_leaf_node}.
 }
 \examples{
