@@ -1,0 +1,186 @@
+
+R version 4.5.1 (2025-06-13) -- "Great Square Root"
+Copyright (C) 2025 The R Foundation for Statistical Computing
+Platform: aarch64-apple-darwin20
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> pkgname <- "forestBalance"
+> source(file.path(R.home("share"), "R", "examples-header.R"))
+> options(warn = 1)
+> library('forestBalance')
+> 
+> base::assign(".oldSearch", base::search(), pos = 'CheckExEnv')
+> base::assign(".old_wd", base::getwd(), pos = 'CheckExEnv')
+> cleanEx()
+> nameEx("compute_balance")
+> ### * compute_balance
+> 
+> flush(stderr()); flush(stdout())
+> 
+> ### Name: compute_balance
+> ### Title: Compute covariate balance diagnostics for a set of weights
+> ### Aliases: compute_balance print.forest_balance_diag
+> 
+> ### ** Examples
+> 
+> 
+> 
+> 
+> 
+> cleanEx()
+> nameEx("forest_balance")
+> ### * forest_balance
+> 
+> flush(stderr()); flush(stdout())
+> 
+> ### Name: forest_balance
+> ### Title: Estimate ATE using forest-based kernel energy balancing
+> ### Aliases: forest_balance
+> 
+> ### ** Examples
+> 
+> 
+> 
+> 
+> 
+> cleanEx()
+> nameEx("forest_kernel")
+> ### * forest_kernel
+> 
+> flush(stderr()); flush(stdout())
+> 
+> ### Name: forest_kernel
+> ### Title: Compute random forest proximity kernel from a GRF forest
+> ### Aliases: forest_kernel
+> 
+> ### ** Examples
+> 
+> 
+> 
+> 
+> 
+> cleanEx()
+> nameEx("get_leaf_node_matrix")
+> ### * get_leaf_node_matrix
+> 
+> flush(stderr()); flush(stdout())
+> 
+> ### Name: get_leaf_node_matrix
+> ### Title: Extract leaf node membership matrix from a GRF forest
+> ### Aliases: get_leaf_node_matrix
+> 
+> ### ** Examples
+> 
+> 
+> 
+> 
+> 
+> cleanEx()
+> nameEx("kernel_balance")
+> ### * kernel_balance
+> 
+> flush(stderr()); flush(stdout())
+> 
+> ### Name: kernel_balance
+> ### Title: Kernel energy balancing weights via closed-form solution
+> ### Aliases: kernel_balance
+> 
+> ### ** Examples
+> 
+> 
+> 
+> 
+> 
+> cleanEx()
+> nameEx("leaf_node_kernel")
+> ### * leaf_node_kernel
+> 
+> flush(stderr()); flush(stdout())
+> 
+> ### Name: leaf_node_kernel
+> ### Title: Compute random forest proximity kernel from a leaf node matrix
+> ### Aliases: leaf_node_kernel
+> 
+> ### ** Examples
+> 
+> 
+> 
+> 
+> 
+> cleanEx()
+> nameEx("simulate_data")
+> ### * simulate_data
+> 
+> flush(stderr()); flush(stdout())
+> 
+> ### Name: simulate_data
+> ### Title: Simulate observational study data with confounding
+> ### Aliases: simulate_data
+> 
+> ### ** Examples
+> 
+> dat <- simulate_data(n = 500, p = 10, ate = 0)
+> str(dat)
+List of 7
+ $ X         : num [1:500, 1:10] 1.512 0.16 -0.253 -1.014 0.574 ...
+  ..- attr(*, "dimnames")=List of 2
+  .. ..$ : NULL
+  .. ..$ : chr [1:10] "X1" "X2" "X3" "X4" ...
+ $ A         : int [1:500] 0 1 0 0 0 1 1 1 1 1 ...
+ $ Y         : num [1:500] 1.34 3.31 -2.2 -5.12 5 ...
+ $ propensity: num [1:500] 0.25 0.724 0.25 0.25 0.472 ...
+ $ ate       : num 0
+ $ n         : num 500
+ $ p         : num 10
+> 
+> # True ATE is 0, naive estimate is biased
+> mean(dat$Y[dat$A == 1]) - mean(dat$Y[dat$A == 0])
+[1] 0.932738
+> 
+> 
+> 
+> 
+> cleanEx()
+> nameEx("summary.forest_balance")
+> ### * summary.forest_balance
+> 
+> flush(stderr()); flush(stdout())
+> 
+> ### Name: summary.forest_balance
+> ### Title: Summarize a forest_balance object
+> ### Aliases: summary.forest_balance print.summary.forest_balance
+> 
+> ### ** Examples
+> 
+> 
+> 
+> 
+> 
+> ### * <FOOTER>
+> ###
+> cleanEx()
+> options(digits = 7L)
+> base::cat("Time elapsed: ", proc.time() - base::get("ptime", pos = 'CheckExEnv'),"\n")
+Time elapsed:  0.274 0.014 0.289 0 0 
+> grDevices::dev.off()
+null device 
+          1 
+> ###
+> ### Local variables: ***
+> ### mode: outline-minor ***
+> ### outline-regexp: "\\(> \\)?### [*]+" ***
+> ### End: ***
+> quit('no')
