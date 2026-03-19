@@ -20,6 +20,7 @@ print.forest_balance <- function(x, ...) {
   cat(sprintf("  n = %s  (n_treated = %d, n_control = %d)\n",
               format(n, big.mark = ","), n1, n0))
   cat(sprintf("  Trees: %d\n", x$forest[["_num_trees"]]))
+  cat(sprintf("  Solver: %s\n", x$solver))
   cat(sprintf("  ATE estimate: %.4f\n", x$ate))
 
   # ESS
@@ -103,9 +104,11 @@ summary.forest_balance <- function(object, X.trans = NULL, threshold = 0.1,
   bal_wt <- compute_balance(X, A, w, X.trans = X.trans,
                             energy.dist = energy.dist)
 
-  # Kernel sparsity
+  # Kernel sparsity (NULL when CG solver was used)
   K <- object$kernel
-  if (inherits(K, "sparseMatrix")) {
+  if (is.null(K)) {
+    kern_sparsity <- NA_real_
+  } else if (inherits(K, "sparseMatrix")) {
     kern_sparsity <- length(K@x) / (as.numeric(n)^2)
   } else {
     kern_sparsity <- sum(K != 0) / (as.numeric(n)^2)
@@ -140,8 +143,12 @@ print.summary.forest_balance <- function(x, ...) {
   cat(sprintf("  n = %s  (n_treated = %d, n_control = %d)\n",
               format(x$n, big.mark = ","), x$n1, x$n0))
   cat(sprintf("  Trees: %d\n", x$num.trees))
-  cat(sprintf("  Kernel density: %.1f%% nonzero\n",
-              x$kernel_sparsity * 100))
+  if (!is.na(x$kernel_sparsity)) {
+    cat(sprintf("  Kernel density: %.1f%% nonzero\n",
+                x$kernel_sparsity * 100))
+  } else {
+    cat("  Solver: CG (kernel not materialized)\n")
+  }
   cat(sprintf("\n  ATE estimate: %.4f\n", x$ate))
   cat(strrep("=", 60), "\n\n")
 

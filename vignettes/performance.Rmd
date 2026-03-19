@@ -1,0 +1,233 @@
+---
+title: "Performance and Scalability"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Performance and Scalability}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, message = FALSE, warning = FALSE,
+  fig.width = 6.5, fig.height = 4, collapse = TRUE, comment = "#>"
+)
+```
+
+## Overview
+
+This vignette benchmarks the `forestBalance` pipeline---leaf node extraction,
+kernel construction, and weight computation---to characterize how speed, memory,
+and kernel sparsity scale with sample size ($n$) and number of trees ($B$).
+
+The two computationally critical components are:
+
+- **`get_leaf_node_matrix()`**: traverses all $B$ trees for $n$ observations.
+  Implemented in C++ via Rcpp.
+- **`leaf_node_kernel()`**: constructs a sparse indicator matrix and computes a
+  single sparse `tcrossprod`.
+
+We benchmark up to $n = 25{,}000$ to demonstrate feasibility at scales where a
+dense $n \times n$ kernel matrix would require 4.7 GB.
+
+```{r packages}
+library(forestBalance)
+library(grf)
+library(Matrix)
+```
+
+## Benchmark
+
+```{r benchmark, cache=TRUE}
+n_vals    <- c(500, 1000, 2500, 5000, 10000, 25000)
+tree_vals <- c(500, 1000, 2000)
+p <- 10
+
+results <- data.frame()
+
+for (nn in n_vals) {
+  for (B in tree_vals) {
+    set.seed(123)
+    dat <- simulate_data(n = nn, p = p)
+
+    # Fit forest
+    t_fit <- system.time({
+      fit <- multi_regression_forest(
+        dat$X, scale(cbind(dat$A, dat$Y)),
+        num.trees = B, min.node.size = 10
+      )
+    })["elapsed"]
+
+    # Leaf node extraction
+    t_leaf <- system.time({
+      leaf_mat <- get_leaf_node_matrix(fit, dat$X)
+    })["elapsed"]
+
+    # Kernel construction
+    t_kern <- system.time({
+      K <- leaf_node_kernel(leaf_mat)
+    })["elapsed"]
+
+    # Kernel balance
+    t_bal <- system.time({
+      w <- kernel_balance(dat$A, K)
+    })["elapsed"]
+
+    # Stats
+    nnz <- length(K@x)
+    pct_nz <- 100 * nnz / as.numeric(nn)^2
+    mem_sparse <- as.numeric(object.size(K)) / 1e6
+    mem_dense  <- 8 * as.numeric(nn)^2 / 1e6
+
+    results <- rbind(results, data.frame(
+      n = nn, trees = B,
+      t_fit = t_fit, t_leaf = t_leaf, t_kern = t_kern, t_bal = t_bal,
+      t_total = t_fit + t_leaf + t_kern + t_bal,
+      nnz_M = nnz / 1e6, pct_nz = pct_nz,
+      sparse_MB = mem_sparse, dense_MB = mem_dense
+    ))
+  }
+}
+```
+
+## Timing
+
+The table below shows wall-clock time for each pipeline stage.  "Total" includes
+forest fitting, leaf extraction, kernel construction, and weight computation.
+
+```{r timing-table, echo=FALSE}
+tbl <- results
+tbl$t_fit  <- round(tbl$t_fit, 1)
+tbl$t_leaf <- round(tbl$t_leaf, 2)
+tbl$t_kern <- round(tbl$t_kern, 2)
+tbl$t_bal  <- round(tbl$t_bal, 2)
+tbl$t_total <- round(tbl$t_total, 1)
+disp <- tbl[, c("n", "trees", "t_fit", "t_leaf", "t_kern", "t_bal", "t_total")]
+names(disp) <- c("n", "Trees", "Fit (s)", "Leaf (s)", "Kernel (s)",
+                  "Balance (s)", "Total (s)")
+knitr::kable(disp, row.names = FALSE, align = "rrrrrrr",
+             caption = "Pipeline timing by stage.")
+```
+
+Leaf node extraction and kernel construction both scale approximately linearly
+in $n$ and $B$.  The forest fitting itself (handled by `grf`) is typically the
+fastest step.
+
+```{r timing-plot, echo=FALSE, fig.height=4}
+cols <- c("500" = "#E69F00", "1000" = "#56B4E9", "2000" = "#009E73")
+
+par(mfrow = c(1, 2), mar = c(4, 4, 2, 1))
+
+# Total time vs n
+plot(NULL, xlim = range(results$n), ylim = range(results$t_total),
+     xlab = "n", ylab = "Total time (s)", log = "xy",
+     main = "Total time vs n")
+for (tr in unique(results$trees)) {
+  sub <- results[results$trees == tr, ]
+  lines(sub$n, sub$t_total, type = "b", pch = 16,
+        col = cols[as.character(tr)], lwd = 2)
+}
+legend("topleft", legend = paste(names(cols), "trees"),
+       col = cols, pch = 16, lty = 1, lwd = 2, bty = "n", cex = 0.85)
+
+# Time breakdown at B=1000
+sub1k <- results[results$trees == 1000, ]
+bardata <- t(as.matrix(sub1k[, c("t_fit", "t_leaf", "t_kern", "t_bal")]))
+colnames(bardata) <- format(sub1k$n, big.mark = ",")
+barplot(bardata, col = c("grey70", "#56B4E9", "#009E73", "#CC79A7"),
+        xlab = "n", ylab = "Time (s)", main = "Breakdown (1000 trees)",
+        legend.text = c("Forest fit", "Leaf extract", "Kernel build", "Balance"),
+        args.legend = list(cex = 0.7, bty = "n"))
+```
+
+## Kernel sparsity
+
+The proximity kernel becomes sparser as $n$ increases: with more observations,
+fewer pairs share a leaf in any given tree.  At $n = 25{,}000$ with 2,000 trees,
+only about 5% of entries are nonzero.
+
+```{r sparsity-table, echo=FALSE}
+stbl <- results[, c("n", "trees", "pct_nz", "nnz_M")]
+stbl$pct_nz <- paste0(round(stbl$pct_nz, 1), "%")
+stbl$nnz_M  <- round(stbl$nnz_M, 1)
+names(stbl) <- c("n", "Trees", "% nonzero", "Nonzeros (M)")
+knitr::kable(stbl, row.names = FALSE, align = "rrlr",
+             caption = "Kernel sparsity across configurations.")
+```
+
+```{r sparsity-plot, echo=FALSE, fig.height=3.5}
+par(mar = c(4, 4, 2, 1))
+plot(NULL, xlim = range(results$n), ylim = c(0, max(results$pct_nz)),
+     xlab = "n", ylab = "% nonzero", main = "Kernel density vs n")
+for (tr in unique(results$trees)) {
+  sub <- results[results$trees == tr, ]
+  lines(sub$n, sub$pct_nz, type = "b", pch = 16,
+        col = cols[as.character(tr)], lwd = 2)
+}
+legend("topright", legend = paste(names(cols), "trees"),
+       col = cols, pch = 16, lty = 1, lwd = 2, bty = "n")
+```
+
+## Memory: sparse vs dense
+
+A dense $n \times n$ double matrix requires $8n^2$ bytes.  At $n = 25{,}000$
+this is **4.7 GB**---well beyond typical RAM budgets for a single matrix.  The
+sparse representation exploits the kernel's low density and grows much more
+slowly.
+
+```{r memory-table, echo=FALSE}
+mtbl <- results[, c("n", "trees", "sparse_MB", "dense_MB")]
+mtbl$ratio <- paste0(round(mtbl$sparse_MB / mtbl$dense_MB * 100, 1), "%")
+mtbl$sparse_MB <- round(mtbl$sparse_MB, 1)
+mtbl$dense_MB  <- format(round(mtbl$dense_MB, 0), big.mark = ",")
+names(mtbl) <- c("n", "Trees", "Sparse (MB)", "Dense (MB)", "Sparse / Dense")
+knitr::kable(mtbl, row.names = FALSE, align = "rrrrl",
+             caption = "Kernel memory: sparse (actual) vs dense (theoretical).")
+```
+
+```{r memory-plot, echo=FALSE, fig.height=4}
+par(mar = c(4, 4.5, 2, 1))
+plot(NULL, xlim = range(results$n),
+     ylim = c(min(results$sparse_MB), max(results$dense_MB)),
+     xlab = "n", ylab = "Memory (MB)", log = "xy",
+     main = "Kernel memory: sparse vs dense")
+
+# Dense reference
+dns <- results[results$trees == results$trees[1], ]
+lines(dns$n, dns$dense_MB, type = "b", pch = 4, col = "firebrick",
+      lwd = 2, lty = 2)
+
+for (tr in unique(results$trees)) {
+  sub <- results[results$trees == tr, ]
+  lines(sub$n, sub$sparse_MB, type = "b", pch = 16,
+        col = cols[as.character(tr)], lwd = 2)
+}
+legend("topleft",
+       legend = c("Dense (theoretical)", paste(names(cols), "trees (sparse)")),
+       col = c("firebrick", cols), pch = c(4, 16, 16, 16),
+       lty = c(2, 1, 1, 1), lwd = 2, bty = "n", cex = 0.8)
+```
+
+At $n = 25{,}000$ the sparse kernel uses about **6--8%** of what a dense matrix
+would require, making problems at this scale tractable on a standard laptop.
+
+## Summary
+
+```{r summary-table, echo=FALSE}
+big <- results[results$n == max(results$n) & results$trees == max(results$trees), ]
+cat(sprintf("Largest configuration tested: n = %s, B = %s\n",
+            format(big$n, big.mark = ","), format(big$trees, big.mark = ",")))
+cat(sprintf("  Total pipeline time: %.0f seconds\n", big$t_total))
+cat(sprintf("  Kernel sparsity:     %.1f%% nonzero\n", big$pct_nz))
+cat(sprintf("  Sparse memory:       %.0f MB (vs %.0f MB dense)\n",
+            big$sparse_MB, big$dense_MB))
+```
+
+### Key takeaways:
+
+- **Leaf extraction** (C++) and **kernel construction** (sparse `tcrossprod`)
+  each scale approximately linearly in both $n$ and $B$.
+- The **kernel is naturally sparse** and becomes sparser as $n$ grows, making
+  the sparse representation increasingly advantageous.
+- At $n = 25{,}000$, the full pipeline (forest fit + kernel + weights) runs in
+  under two minutes, using a fraction of the memory a dense approach would need.

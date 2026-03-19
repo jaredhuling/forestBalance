@@ -11,6 +11,8 @@ forest_balance(
   num.trees = 1000,
   min.node.size = 10,
   scale.outcomes = TRUE,
+  solver = c("auto", "direct", "cg"),
+  tol = 5e-11,
   ...
 )
 }
@@ -30,6 +32,13 @@ is 10.}
 \code{cbind(A, Y)} is column-standardized before fitting the forest. This
 ensures that treatment and outcome contribute equally to the splits.}
 
+\item{solver}{Which linear solver to use for the balancing weights.
+\code{"auto"} (default) selects \code{"direct"} for \eqn{n \le 5000}
+and \code{"cg"} for \eqn{n > 5000}. See \code{\link{kernel_balance}} for
+details.}
+
+\item{tol}{Convergence tolerance for the CG solver. Default is \code{5e-11}.}
+
 \item{...}{Additional arguments passed to
 \code{\link[grf]{multi_regression_forest}}.}
 }
@@ -39,10 +48,13 @@ following elements:
 \describe{
 \item{ate}{The estimated average treatment effect (Hajek estimator).}
 \item{weights}{The balancing weights from \code{\link{kernel_balance}}.}
-\item{kernel}{The \eqn{n \times n} forest proximity kernel (sparse matrix).}
+\item{kernel}{The \eqn{n \times n} forest proximity kernel (sparse matrix),
+or \code{NULL} when the CG solver is used (since the kernel is never
+formed).}
 \item{forest}{The trained \code{\link[grf]{multi_regression_forest}} object.}
 \item{X, A, Y}{The input data (stored for use by \code{\link{summary.forest_balance}}).}
 \item{n, n1, n0}{Total, treated, and control sample sizes.}
+\item{solver}{The solver that was used (\code{"direct"} or \code{"cg"}).}
 }
 The object has \code{print} and \code{summary} methods. Use
 \code{\link{summary.forest_balance}} for covariate balance diagnostics.
@@ -67,6 +79,12 @@ kernel captures confounding structure.
 closed-form kernel energy distance solution. The ATE is then estimated
 using the Hajek (ratio) estimator with these weights.
 }
+
+For \eqn{n \le 5000} (or when \code{solver = "direct"}), the kernel matrix
+is formed explicitly and the balancing system is solved via sparse Cholesky.
+For \eqn{n > 5000} (or when \code{solver = "cg"}), the kernel is never
+formed; instead, a conjugate gradient solver operates on the factored
+representation \eqn{K = Z Z^\top / B}, saving both time and memory.
 }
 \examples{
 \donttest{
@@ -82,6 +100,7 @@ result$ate
 
 }
 \references{
-De, B. and Huling, J. (2025). Data adaptive covariate balancing for causal effect
-estimation for high dimensional data \emph{arXiv preprint arXiv:2512.18069}.
+De, S. and Huling, J.D. (2025). Data adaptive covariate balancing for causal
+effect estimation for high dimensional data.
+\emph{arXiv preprint arXiv:2512.18069}.
 }

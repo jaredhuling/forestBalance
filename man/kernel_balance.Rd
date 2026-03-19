@@ -4,15 +4,43 @@
 \alias{kernel_balance}
 \title{Kernel energy balancing weights via closed-form solution}
 \usage{
-kernel_balance(trt, kern)
+kernel_balance(
+  trt,
+  kern = NULL,
+  Z = NULL,
+  num.trees = NULL,
+  solver = c("auto", "direct", "cg"),
+  tol = 5e-11,
+  maxiter = 1000L
+)
 }
 \arguments{
 \item{trt}{A binary (0/1) integer or numeric vector indicating treatment
 assignment (\code{1} = treated, \code{0} = control).}
 
-\item{kern}{A symmetric \eqn{n \times n} kernel matrix, where \eqn{n} is the
-length of \code{trt}. Typically a random forest proximity kernel from
-\code{\link{forest_kernel}}.}
+\item{kern}{A symmetric \eqn{n \times n} kernel matrix (dense or sparse), or
+\code{NULL} if \code{Z} is provided.}
+
+\item{Z}{Optional sparse indicator matrix from
+\code{\link{leaf_node_kernel_Z}} such that \eqn{K = Z Z^\top / B}. When
+supplied, the solver can avoid forming the full kernel matrix. If both
+\code{kern} and \code{Z} are given, \code{Z} takes priority when the CG
+solver is selected.}
+
+\item{num.trees}{Number of trees \eqn{B}. Required when \code{Z} is
+provided.}
+
+\item{solver}{Which linear solver to use. \code{"auto"} (default) selects
+\code{"direct"} for \eqn{n \le 5000} and \code{"cg"} for
+\eqn{n > 5000}. \code{"direct"} uses sparse Cholesky on the treated and
+control sub-blocks of the kernel. \code{"cg"} uses conjugate gradient
+iterations with the factored \eqn{Z} representation, avoiding formation of
+any kernel matrix.}
+
+\item{tol}{Convergence tolerance for the CG solver. Default is \code{5e-11}.
+Ignored when \code{solver = "direct"}.}
+
+\item{maxiter}{Maximum CG iterations. Default is 1000.}
 }
 \value{
 A list with the following elements:
@@ -20,6 +48,7 @@ A list with the following elements:
 \item{weights}{A numeric vector of length \eqn{n} containing the balancing
 weights. Treated weights sum to \eqn{n_1} and control weights sum to
 \eqn{n_0}.}
+\item{solver}{The solver that was used (\code{"direct"} or \code{"cg"}).}
 }
 }
 \description{
@@ -29,16 +58,21 @@ weights are obtained via a closed-form solution to a linear system derived
 from the kernel energy distance objective.
 }
 \details{
-The kernel energy distance between two distributions \eqn{P} and \eqn{Q}
-measured via kernel \eqn{K} has a quadratic form. By setting up the
-optimization to balance the treated and control groups towards the overall
-sample, subject to group-wise sum constraints, the solution reduces to a
-linear system involving the kernel matrix.
+The modified kernel \eqn{K_q} used in the optimization is block-diagonal:
+the treated--control cross-blocks are zero because
+\eqn{K_q(i,j) = 0} whenever \eqn{A_i \neq A_j}. Both solvers exploit this
+structure by working on the treated and control blocks independently.
 
-Specifically, the method solves:
-\deqn{w = K^{-1} z,}
-where \eqn{z} is adjusted to satisfy the constraints
-\eqn{\sum_{i: A_i=1} w_i = n_1} and \eqn{\sum_{i: A_i=0} w_i = n_0}.
+The \strong{direct} solver extracts the sub-blocks \eqn{K_{tt}} and
+\eqn{K_{cc}} and solves via sparse Cholesky. This gives exact solutions
+but requires forming (at least sub-blocks of) the kernel matrix.
+
+The \strong{CG} solver uses the factored representation \eqn{K = Z Z^\top / B}
+to perform matrix--vector products without forming any kernel matrix,
+via \eqn{K v = Z (Z^\top v) / B}. This is much faster and more
+memory-efficient at large \eqn{n} (e.g., \eqn{n > 5000}). The CG iterates
+converge to the exact solution; the default tolerance of \code{5e-11} yields
+weight vectors that agree with the direct solution to several decimal places.
 }
 \examples{
 \donttest{
@@ -61,6 +95,7 @@ ate <- weighted.mean(Y[A == 1], w[A == 1]) -
 
 }
 \references{
-De, B. and Huling, J. (2024). Kernel Energy Balancing with Random Forest
-Similarity. \emph{arXiv preprint arXiv:2512.18069}.
+De, S. and Huling, J.D. (2025). Data adaptive covariate balancing for causal
+effect estimation for high dimensional data.
+\emph{arXiv preprint arXiv:2512.18069}.
 }

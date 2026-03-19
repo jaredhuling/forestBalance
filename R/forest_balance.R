@@ -14,6 +14,11 @@
 #' @param scale.outcomes If \code{TRUE} (default), the joint outcome matrix
 #'   \code{cbind(A, Y)} is column-standardized before fitting the forest. This
 #'   ensures that treatment and outcome contribute equally to the splits.
+#' @param solver Which linear solver to use for the balancing weights.
+#'   \code{"auto"} (default) selects \code{"direct"} for \eqn{n \le 5000}
+#'   and \code{"cg"} for \eqn{n > 5000}. See \code{\link{kernel_balance}} for
+#'   details.
+#' @param tol Convergence tolerance for the CG solver. Default is \code{5e-11}.
 #' @param ... Additional arguments passed to
 #'   \code{\link[grf]{multi_regression_forest}}.
 #'
@@ -22,10 +27,13 @@
 #' \describe{
 #'   \item{ate}{The estimated average treatment effect (Hajek estimator).}
 #'   \item{weights}{The balancing weights from \code{\link{kernel_balance}}.}
-#'   \item{kernel}{The \eqn{n \times n} forest proximity kernel (sparse matrix).}
+#'   \item{kernel}{The \eqn{n \times n} forest proximity kernel (sparse matrix),
+#'     or \code{NULL} when the CG solver is used (since the kernel is never
+#'     formed).}
 #'   \item{forest}{The trained \code{\link[grf]{multi_regression_forest}} object.}
 #'   \item{X, A, Y}{The input data (stored for use by \code{\link{summary.forest_balance}}).}
 #'   \item{n, n1, n0}{Total, treated, and control sample sizes.}
+#'   \item{solver}{The solver that was used (\code{"direct"} or \code{"cg"}).}
 #' }
 #' The object has \code{print} and \code{summary} methods. Use
 #' \code{\link{summary.forest_balance}} for covariate balance diagnostics.
@@ -45,9 +53,16 @@
 #'     using the Hajek (ratio) estimator with these weights.
 #' }
 #'
+#' For \eqn{n \le 5000} (or when \code{solver = "direct"}), the kernel matrix
+#' is formed explicitly and the balancing system is solved via sparse Cholesky.
+#' For \eqn{n > 5000} (or when \code{solver = "cg"}), the kernel is never
+#' formed; instead, a conjugate gradient solver operates on the factored
+#' representation \eqn{K = Z Z^\top / B}, saving both time and memory.
+#'
 #' @references
-#' De, B. and Huling, J. (2025). Data adaptive covariate balancing for causal effect 
-#' estimation for high dimensional data \emph{arXiv preprint arXiv:2512.18069}.
+#' De, S. and Huling, J.D. (2025). Data adaptive covariate balancing for causal
+#' effect estimation for high dimensional data.
+#' \emph{arXiv preprint arXiv:2512.18069}.
 #'
 #' @examples
 #' \donttest{
@@ -68,7 +83,10 @@ forest_balance <- function(X, A, Y,
                            num.trees = 1000,
                            min.node.size = 10,
                            scale.outcomes = TRUE,
+                           solver = c("auto", "direct", "cg"),
+                           tol = 5e-11,
                            ...) {
+  solver <- match.arg(solver)
   X <- as.matrix(X)
   n <- nrow(X)
 
@@ -93,11 +111,23 @@ forest_balance <- function(X, A, Y,
     ...
   )
 
-  # Compute the random forest proximity kernel
-  K <- forest_kernel(forest, newdata = X)
+  # Extract leaf node matrix (C++)
+  leaf_mat <- get_leaf_node_matrix(forest, newdata = X)
 
-  # Compute kernel energy balancing weights
-  bal <- kernel_balance(trt = A, kern = K)
+  # Determine effective solver
+  use_cg <- (solver == "cg") || (solver == "auto" && n > 5000)
+
+  if (use_cg) {
+    # CG path: build Z, skip K entirely
+    Z <- leaf_node_kernel_Z(leaf_mat)
+    bal <- kernel_balance(trt = A, Z = Z, num.trees = num.trees,
+                          solver = "cg", tol = tol)
+    K <- NULL
+  } else {
+    # Direct path: build full K, solve via sparse Cholesky
+    K <- leaf_node_kernel(leaf_mat)
+    bal <- kernel_balance(trt = A, kern = K, solver = "direct")
+  }
   w <- bal$weights
 
   # Hajek (ratio) ATE estimator
@@ -114,7 +144,8 @@ forest_balance <- function(X, A, Y,
     Y       = Y,
     n       = n,
     n1      = as.integer(sum(A == 1)),
-    n0      = as.integer(sum(A == 0))
+    n0      = as.integer(sum(A == 0)),
+    solver  = bal$solver
   )
   class(out) <- "forest_balance"
   out

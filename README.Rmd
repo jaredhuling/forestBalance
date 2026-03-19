@@ -28,7 +28,7 @@ distribution of confounders specifically.
 
 The method is described in:
 
-> De, B. and Huling, J. (2025). *Data adaptive covariate balancing for causal effect 
+> De, S. and Huling, J.D. (2025). *Data adaptive covariate balancing for causal effect 
 > estimation for high dimensional data.* arXiv:2512.18069.
 
 ## Installation

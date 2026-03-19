@@ -1,0 +1,240 @@
+---
+title: "Getting Started with forestBalance"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting Started with forestBalance}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, message = FALSE, warning = FALSE,
+  fig.width = 6.5, fig.height = 4, collapse = TRUE, comment = "#>"
+)
+```
+
+## Overview
+
+`forestBalance` estimates average treatment effects (ATE) in observational
+studies by combining multivariate random forests with kernel energy balancing.
+The key idea is:
+
+1. Fit a random forest that jointly predicts treatment *and* outcome from
+   covariates, so that the tree structure captures confounding.
+2. Use the forest's leaf co-membership to define a similarity kernel.
+3. Obtain balancing weights via a closed-form kernel energy distance solution.
+
+Because the kernel reflects the nonlinear relationships between covariates,
+treatment, and outcome, the resulting weights can balance complex confounding
+structure that linear methods may miss.
+
+The method is described in:
+
+> De, S. and Huling, J.D. (2025). *Data adaptive covariate balancing for causal
+> effect estimation for high dimensional data.* arXiv:2512.18069.
+
+## Setup
+
+```{r packages}
+library(forestBalance)
+library(WeightIt)
+```
+
+## Simulating data
+
+`simulate_data()` generates observational data with nonlinear confounding.  The
+propensity score depends on $X_1$ through a Beta density, and the outcome
+depends nonlinearly on $X_1$, $X_2$, and $X_5$:
+
+```{r data}
+set.seed(2024)
+dat <- simulate_data(n = 800, p = 10, ate = 0)
+
+cat("True ATE:", dat$ate, "\n")
+cat("Naive ATE:", round(mean(dat$Y[dat$A == 1]) - mean(dat$Y[dat$A == 0]), 4), "\n")
+```
+
+The naive difference-in-means is badly biased because of confounding.
+
+## Estimating the ATE
+
+### Forest balance
+
+```{r forest-balance}
+fit_fb <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 1000)
+fit_fb
+```
+
+### Entropy balancing (WeightIt)
+
+Entropy balancing finds weights that exactly balance covariate means between
+treated and control groups:
+
+```{r ebal}
+df <- data.frame(A = dat$A, dat$X)
+fit_ebal <- weightit(A ~ ., data = df, method = "ebal")
+
+ate_ebal <- weighted.mean(dat$Y[dat$A == 1], fit_ebal$weights[dat$A == 1]) -
+            weighted.mean(dat$Y[dat$A == 0], fit_ebal$weights[dat$A == 0])
+```
+
+### Energy balancing (WeightIt)
+
+Energy balancing minimizes the energy distance between the weighted treated and
+control covariate distributions:
+
+```{r energy}
+fit_energy <- weightit(A ~ ., data = df, method = "energy")
+
+ate_energy <- weighted.mean(dat$Y[dat$A == 1], fit_energy$weights[dat$A == 1]) -
+              weighted.mean(dat$Y[dat$A == 0], fit_energy$weights[dat$A == 0])
+```
+
+### Comparison
+
+```{r ate-comparison, echo=FALSE}
+ests <- data.frame(
+  Method = c("Naive", "Entropy balancing", "Energy balancing", "Forest balance"),
+  ATE = c(mean(dat$Y[dat$A == 1]) - mean(dat$Y[dat$A == 0]),
+          ate_ebal, ate_energy, fit_fb$ate),
+  stringsAsFactors = FALSE
+)
+ests$Bias <- round(ests$ATE - dat$ate, 4)
+ests$ATE  <- round(ests$ATE, 4)
+knitr::kable(ests, caption = "Single-replication ATE estimates (true ATE = 0).")
+```
+
+## Covariate balance
+
+`summary()` shows the full balance comparison.  Let's also check balance on
+nonlinear transformations of the covariates, since the confounding operates
+through the Beta density:
+
+```{r balance}
+X <- dat$X
+X.nl <- cbind(
+  X[, 1]^2, X[, 2]^2, X[, 5]^2,
+  X[, 1] * X[, 2], X[, 1] * X[, 5],
+  dbeta(X[, 1], 2, 4), dbeta(X[, 5], 2, 4)
+)
+colnames(X.nl) <- c("X1^2", "X2^2", "X5^2", "X1*X2", "X1*X5",
+                     "Beta(X1)", "Beta(X5)")
+
+summary(fit_fb, X.trans = X.nl)
+```
+
+We can use `compute_balance()` to compare all methods on the same terms:
+
+```{r balance-comparison}
+bal_fb     <- compute_balance(dat$X, dat$A, fit_fb$weights, X.trans = X.nl)
+bal_ebal   <- compute_balance(dat$X, dat$A, fit_ebal$weights, X.trans = X.nl)
+bal_energy <- compute_balance(dat$X, dat$A, fit_energy$weights, X.trans = X.nl)
+bal_unwtd  <- compute_balance(dat$X, dat$A, rep(1, dat$n), X.trans = X.nl)
+```
+
+```{r balance-table, echo=FALSE}
+btbl <- data.frame(
+  Method = c("Unweighted", "Entropy balancing", "Energy balancing", "Forest balance"),
+  `Max SMD (linear)` = round(c(bal_unwtd$max_smd, bal_ebal$max_smd,
+                                bal_energy$max_smd, bal_fb$max_smd), 4),
+  `Max SMD (nonlinear)` = round(c(bal_unwtd$max_smd_trans, bal_ebal$max_smd_trans,
+                                   bal_energy$max_smd_trans, bal_fb$max_smd_trans), 4),
+  `ESS treated` = paste0(round(c(1, bal_ebal$ess_treated,
+                                  bal_energy$ess_treated, bal_fb$ess_treated) * 100), "%"),
+  `ESS control` = paste0(round(c(1, bal_ebal$ess_control,
+                                  bal_energy$ess_control, bal_fb$ess_control) * 100), "%"),
+  check.names = FALSE
+)
+knitr::kable(btbl, caption = "Balance diagnostics across methods.")
+```
+
+All three weighting methods reduce the linear covariate imbalance.  Both energy balancing the forest 
+balance approach also reduce imbalance on *nonlinear* functions of the covariates, as they both
+aim to balance the joint distributions of covariates, however, forest balancing over-emphasizes full 
+distributional balance of confounders specifically rather than all possible covariates.
+
+## Simulation study
+
+A simulation study with 200 replications demonstrates the bias reduction more
+systematically:
+
+```{r simulation, cache=TRUE}
+set.seed(1)
+nreps <- 200
+results <- matrix(NA, nreps, 4,
+                  dimnames = list(NULL, c("Naive", "Entropy", "Energy", "Forest")))
+
+for (r in seq_len(nreps)) {
+  dat <- simulate_data(n = 500, p = 10, ate = 0)
+  df  <- data.frame(A = dat$A, dat$X)
+
+  fit_fb <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 500)
+
+  w_ebal   <- tryCatch(weightit(A ~ ., data = df, method = "ebal")$weights,
+                        error = function(e) rep(1, dat$n))
+  w_energy <- tryCatch(weightit(A ~ ., data = df, method = "energy")$weights,
+                        error = function(e) rep(1, dat$n))
+
+  results[r, "Naive"]   <- mean(dat$Y[dat$A == 1]) - mean(dat$Y[dat$A == 0])
+  results[r, "Entropy"] <- weighted.mean(dat$Y[dat$A == 1], w_ebal[dat$A == 1]) -
+                            weighted.mean(dat$Y[dat$A == 0], w_ebal[dat$A == 0])
+  results[r, "Energy"]  <- weighted.mean(dat$Y[dat$A == 1], w_energy[dat$A == 1]) -
+                            weighted.mean(dat$Y[dat$A == 0], w_energy[dat$A == 0])
+  results[r, "Forest"]  <- fit_fb$ate
+}
+```
+
+```{r sim-table, echo=FALSE}
+stbl <- data.frame(
+  Method = colnames(results),
+  Bias   = round(colMeans(results), 4),
+  SD     = round(apply(results, 2, sd), 4),
+  RMSE   = round(sqrt(colMeans(results)^2 + apply(results, 2, var)), 4)
+)
+knitr::kable(stbl, row.names = FALSE, caption = "Simulation results (200 reps, n = 500, true ATE = 0).")
+```
+
+```{r sim-plot, echo=FALSE, fig.height=3.5}
+cols <- c(Naive = "firebrick", Entropy = "darkorange",
+          Energy = "goldenrod3", Forest = "steelblue")
+par(mar = c(4, 0.5, 2, 0.5))
+boxplot(results[, rev(colnames(results))], horizontal = TRUE,
+        col = cols[rev(colnames(results))],
+        main = "ATE estimates (true ATE = 0)", xlab = "Estimated ATE")
+abline(v = 0, lty = 2, col = "grey40", lwd = 1.5)
+```
+
+Forest balance has substantially lower bias than entropy balancing (which only
+balances linear covariate means) and competitive or lower RMSE than energy
+balancing, because the forest-based kernel captures the nonlinear confounding
+structure.
+
+## Step-by-step interface
+
+For more control, the pipeline can be run in stages:
+
+```{r stepwise}
+library(grf)
+
+dat <- simulate_data(n = 500, p = 10)
+
+# 1. Fit the joint forest
+forest <- multi_regression_forest(dat$X, scale(cbind(dat$A, dat$Y)),
+                                  num.trees = 500)
+
+# 2. Extract leaf node matrix (n x B)
+leaf_mat <- get_leaf_node_matrix(forest, dat$X)
+dim(leaf_mat)
+
+# 3. Build sparse proximity kernel
+K <- leaf_node_kernel(leaf_mat)
+cat("Kernel:", round(100 * length(K@x) / prod(dim(K)), 1), "% nonzero\n")
+
+# 4. Compute balancing weights
+bal <- kernel_balance(dat$A, K)
+
+# 5. Estimate ATE
+weighted.mean(dat$Y[dat$A == 1], bal$weights[dat$A == 1]) -
+  weighted.mean(dat$Y[dat$A == 0], bal$weights[dat$A == 0])
+```

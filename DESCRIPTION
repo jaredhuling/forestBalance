@@ -3,7 +3,7 @@ Title: Balancing Confounder Distributions with Forest Energy Balancing
 Version: 0.1.0
 Authors@R: c(
     person("Jared", "Huling", role = c("aut", "cre"), email = "jaredhuling@gmail.com"),
-    person("Bingkai", "De", role = "aut")
+    person("Simion", "De", role = "aut")
     )
 Description: Estimates average treatment effects using kernel energy balancing
     with random forest similarity kernels. A multivariate random forest jointly
@@ -23,5 +23,9 @@ Imports:
     Matrix,
     Rcpp
 Suggests:
+    knitr,
     osqp,
-    testthat (>= 3.0.0)
+    rmarkdown,
+    testthat (>= 3.0.0),
+    WeightIt
+VignetteBuilder: knitr

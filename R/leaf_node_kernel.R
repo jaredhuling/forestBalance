@@ -69,3 +69,45 @@ leaf_node_kernel <- function(leaf_matrix, sparse = TRUE) {
 
   K
 }
+
+
+#' Build the sparse indicator matrix Z from a leaf node matrix
+#'
+#' Returns the sparse \eqn{n \times L} indicator matrix \eqn{Z} such that
+#' the proximity kernel is \eqn{K = Z Z^\top / B}. This factored
+#' representation can be passed to \code{\link{kernel_balance}} to enable the
+#' CG solver, which avoids forming the full \eqn{n \times n} kernel.
+#'
+#' @inheritParams leaf_node_kernel
+#'
+#' @return A sparse \code{dgCMatrix} of dimension \eqn{n \times L}, where
+#'   \eqn{L = \sum_b L_b} is the total number of leaves across all trees.
+#'   Each row has exactly \eqn{B} nonzero entries (one per tree).
+#'
+#' @examples
+#' \donttest{
+#' library(grf)
+#' n <- 100
+#' p <- 5
+#' X <- matrix(rnorm(n * p), n, p)
+#' Y <- cbind(X[, 1] + rnorm(n), X[, 2] + rnorm(n))
+#' forest <- multi_regression_forest(X, Y, num.trees = 50)
+#' leaf_mat <- get_leaf_node_matrix(forest)
+#' Z <- leaf_node_kernel_Z(leaf_mat)
+#' }
+#'
+#' @export
+leaf_node_kernel_Z <- function(leaf_matrix) {
+  n <- nrow(leaf_matrix)
+  B <- ncol(leaf_matrix)
+
+  remapped <- remap_leaves_cpp(leaf_matrix)
+  total_cols <- max(remapped)
+
+  Matrix::sparseMatrix(
+    i = rep(seq_len(n), times = B),
+    j = as.integer(remapped),
+    x = 1,
+    dims = c(n, total_cols)
+  )
+}
