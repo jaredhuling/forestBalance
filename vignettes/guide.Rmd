@@ -51,10 +51,8 @@ depends nonlinearly on $X_1$, $X_2$, and $X_5$:
 set.seed(123)
 dat <- simulate_data(n = 800, p = 10, ate = 0)
 
-# True ATE
-dat$ate
-# Naive (unadjusted) estimate
-round(mean(dat$Y[dat$A == 1]) - mean(dat$Y[dat$A == 0]), 4)
+c("True ATE"  = dat$ate,
+  "Naive ATE" = round(mean(dat$Y[dat$A == 1]) - mean(dat$Y[dat$A == 0]), 4))
 ```
 
 The naive difference-in-means is badly biased because of confounding.
@@ -261,7 +259,7 @@ dim(leaf_mat)
 
 # 3. Build sparse proximity kernel
 K <- leaf_node_kernel(leaf_mat)
-round(100 * length(K@x) / prod(dim(K)), 1)  # % nonzero
+c("kernel % nonzero" = round(100 * length(K@x) / prod(dim(K)), 1))
 
 # 4. Compute balancing weights
 bal <- kernel_balance(dat$A, K)

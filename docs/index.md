@@ -81,8 +81,9 @@ dat <- simulate_data(n = 800, p = 10, ate = 0)
 
 # Naive (unweighted) estimate is biased
 naive_ate <- mean(dat$Y[dat$A == 1]) - mean(dat$Y[dat$A == 0])
-round(naive_ate, 4)  # true ATE = 0
-#> [1] 0.9812
+c("Naive ATE" = round(naive_ate, 4), "True ATE" = 0)
+#> Naive ATE  True ATE 
+#>    0.9812    0.0000
 ```
 
 ### Fitting the model
@@ -255,18 +256,21 @@ forest <- multi_regression_forest(dat$X, scale(cbind(dat$A, dat$Y)),
 leaf_mat <- get_leaf_node_matrix(forest, dat$X)
 K <- leaf_node_kernel(leaf_mat)
 
-dim(leaf_mat)  # n x B
-#> [1] 800 500
-round(100 * length(K@x) / prod(dim(K)), 1)  # % nonzero
-#> [1] 24.5
+c("observations" = nrow(leaf_mat), "trees" = ncol(leaf_mat))
+#> observations        trees 
+#>          800          500
+c("kernel % nonzero" = round(100 * length(K@x) / prod(dim(K)), 1))
+#> kernel % nonzero 
+#>             24.5
 
 # 3. Compute balancing weights
 bal <- kernel_balance(dat$A, K)
 
 ate <- weighted.mean(dat$Y[dat$A == 1], bal$weights[dat$A == 1]) -
        weighted.mean(dat$Y[dat$A == 0], bal$weights[dat$A == 0])
-round(ate, 4)
-#> [1] 0.1455
+c("ATE estimate" = round(ate, 4))
+#> ATE estimate 
+#>       0.1455
 ```
 
 ## Simulation study

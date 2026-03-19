@@ -376,13 +376,13 @@ arXiv:2512.18069.</p>
 nonlinear confounding. The propensity score depends on <span class="math inline">\(X_1\)</span> through a Beta density, and the
 outcome depends nonlinearly on <span class="math inline">\(X_1\)</span>,
 <span class="math inline">\(X_2\)</span>, and <span class="math inline">\(X_5\)</span>:</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2024</span>)</span>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">123</span>)</span>
 <span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>dat <span class="ot">&lt;-</span> <span class="fu">simulate_data</span>(<span class="at">n =</span> <span class="dv">800</span>, <span class="at">p =</span> <span class="dv">10</span>, <span class="at">ate =</span> <span class="dv">0</span>)</span>
 <span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;True ATE:&quot;</span>, dat<span class="sc">$</span>ate, <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>)</span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="co">#&gt; True ATE: 0</span></span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Naive ATE:&quot;</span>, <span class="fu">round</span>(<span class="fu">mean</span>(dat<span class="sc">$</span>Y[dat<span class="sc">$</span>A <span class="sc">==</span> <span class="dv">1</span>]) <span class="sc">-</span> <span class="fu">mean</span>(dat<span class="sc">$</span>Y[dat<span class="sc">$</span>A <span class="sc">==</span> <span class="dv">0</span>]), <span class="dv">4</span>), <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>)</span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co">#&gt; Naive ATE: 1.5486</span></span></code></pre></div>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="fu">c</span>(<span class="st">&quot;True ATE&quot;</span>  <span class="ot">=</span> dat<span class="sc">$</span>ate,</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>  <span class="st">&quot;Naive ATE&quot;</span> <span class="ot">=</span> <span class="fu">round</span>(<span class="fu">mean</span>(dat<span class="sc">$</span>Y[dat<span class="sc">$</span>A <span class="sc">==</span> <span class="dv">1</span>]) <span class="sc">-</span> <span class="fu">mean</span>(dat<span class="sc">$</span>Y[dat<span class="sc">$</span>A <span class="sc">==</span> <span class="dv">0</span>]), <span class="dv">4</span>))</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="co">#&gt;  True ATE Naive ATE </span></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co">#&gt;    0.0000    0.9812</span></span></code></pre></div>
 <p>The naive difference-in-means is badly biased because of
 confounding.</p>
 </div>
@@ -394,11 +394,11 @@ confounding.</p>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>fit_fb</span>
 <span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co">#&gt; Forest Kernel Energy Balancing</span></span>
 <span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a><span class="co">#&gt; -------------------------------------------------- </span></span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="co">#&gt;   n = 800  (n_treated = 299, n_control = 501)</span></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="co">#&gt;   n = 800  (n_treated = 275, n_control = 525)</span></span>
 <span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="co">#&gt;   Trees: 1000</span></span>
 <span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="co">#&gt;   Solver: direct</span></span>
-<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="co">#&gt;   ATE estimate: 0.0988</span></span>
-<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="co">#&gt;   ESS: treated = 217/299 (73%)   control = 348/501 (69%)</span></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="co">#&gt;   ATE estimate: 0.0388</span></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="co">#&gt;   ESS: treated = 191/275 (70%)   control = 394/525 (75%)</span></span>
 <span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a><span class="co">#&gt; -------------------------------------------------- </span></span>
 <span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a><span class="co">#&gt; Use summary() for covariate balance details.</span></span></code></pre></div>
 </div>
@@ -434,19 +434,19 @@ treated and control covariate distributions:</p>
 <tbody>
 <tr class="odd">
 <td align="left">Naive</td>
-<td align="right">1.5486</td>
+<td align="right">0.9812</td>
 </tr>
 <tr class="even">
 <td align="left">Entropy balancing</td>
-<td align="right">0.9078</td>
+<td align="right">0.8246</td>
 </tr>
 <tr class="odd">
 <td align="left">Energy balancing</td>
-<td align="right">0.8313</td>
+<td align="right">0.6277</td>
 </tr>
 <tr class="even">
 <td align="left">Forest balance</td>
-<td align="right">0.0988</td>
+<td align="right">0.0388</td>
 </tr>
 <tr class="odd">
 <td align="left">Truth</td>
@@ -473,54 +473,54 @@ confounding operates through the Beta density:</p>
 <span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="fu">summary</span>(fit_fb, <span class="at">X.trans =</span> X.nl)</span>
 <span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="co">#&gt; Forest Kernel Energy Balancing</span></span>
 <span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="co">#&gt; ============================================================ </span></span>
-<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a><span class="co">#&gt;   n = 800  (n_treated = 299, n_control = 501)</span></span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a><span class="co">#&gt;   n = 800  (n_treated = 275, n_control = 525)</span></span>
 <span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a><span class="co">#&gt;   Trees: 1000</span></span>
-<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a><span class="co">#&gt;   Kernel density: 28.7% nonzero</span></span>
+<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a><span class="co">#&gt;   Kernel density: 29.0% nonzero</span></span>
 <span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a><span class="co">#&gt;   ATE estimate: 0.0988</span></span>
+<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a><span class="co">#&gt;   ATE estimate: 0.0388</span></span>
 <span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a><span class="co">#&gt; ============================================================ </span></span>
 <span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a><span class="co">#&gt; </span></span>
 <span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a><span class="co">#&gt; Covariate Balance (|SMD|)</span></span>
 <span id="cb6-21"><a href="#cb6-21" tabindex="-1"></a><span class="co">#&gt; ------------------------------------------------------------ </span></span>
 <span id="cb6-22"><a href="#cb6-22" tabindex="-1"></a><span class="co">#&gt;   Covariate     Unweighted      Weighted</span></span>
 <span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a><span class="co">#&gt;   ----------  ------------  ------------</span></span>
-<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a><span class="co">#&gt;   X1              0.2476 *        0.0322</span></span>
-<span id="cb6-25"><a href="#cb6-25" tabindex="-1"></a><span class="co">#&gt;   X2                0.0672        0.0109</span></span>
-<span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a><span class="co">#&gt;   X3                0.0185        0.0064</span></span>
-<span id="cb6-27"><a href="#cb6-27" tabindex="-1"></a><span class="co">#&gt;   X4                0.0134        0.0247</span></span>
-<span id="cb6-28"><a href="#cb6-28" tabindex="-1"></a><span class="co">#&gt;   X5                0.0332        0.0221</span></span>
-<span id="cb6-29"><a href="#cb6-29" tabindex="-1"></a><span class="co">#&gt;   X6                0.0293        0.0171</span></span>
-<span id="cb6-30"><a href="#cb6-30" tabindex="-1"></a><span class="co">#&gt;   X7              0.1569 *        0.0158</span></span>
-<span id="cb6-31"><a href="#cb6-31" tabindex="-1"></a><span class="co">#&gt;   X8              0.1505 *        0.0159</span></span>
-<span id="cb6-32"><a href="#cb6-32" tabindex="-1"></a><span class="co">#&gt;   X9                0.0032        0.0012</span></span>
-<span id="cb6-33"><a href="#cb6-33" tabindex="-1"></a><span class="co">#&gt;   X10               0.0087        0.0178</span></span>
+<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a><span class="co">#&gt;   X1              0.1668 *        0.0220</span></span>
+<span id="cb6-25"><a href="#cb6-25" tabindex="-1"></a><span class="co">#&gt;   X2              0.2956 *        0.0086</span></span>
+<span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a><span class="co">#&gt;   X3                0.0277        0.0148</span></span>
+<span id="cb6-27"><a href="#cb6-27" tabindex="-1"></a><span class="co">#&gt;   X4              0.1102 *        0.0242</span></span>
+<span id="cb6-28"><a href="#cb6-28" tabindex="-1"></a><span class="co">#&gt;   X5                0.0430        0.0210</span></span>
+<span id="cb6-29"><a href="#cb6-29" tabindex="-1"></a><span class="co">#&gt;   X6                0.0189        0.0055</span></span>
+<span id="cb6-30"><a href="#cb6-30" tabindex="-1"></a><span class="co">#&gt;   X7                0.0945        0.0258</span></span>
+<span id="cb6-31"><a href="#cb6-31" tabindex="-1"></a><span class="co">#&gt;   X8                0.0733        0.0033</span></span>
+<span id="cb6-32"><a href="#cb6-32" tabindex="-1"></a><span class="co">#&gt;   X9                0.0332        0.0284</span></span>
+<span id="cb6-33"><a href="#cb6-33" tabindex="-1"></a><span class="co">#&gt;   X10               0.0734        0.0055</span></span>
 <span id="cb6-34"><a href="#cb6-34" tabindex="-1"></a><span class="co">#&gt;   ----------  ------------  ------------</span></span>
-<span id="cb6-35"><a href="#cb6-35" tabindex="-1"></a><span class="co">#&gt;   Max |SMD|         0.2476        0.0322</span></span>
+<span id="cb6-35"><a href="#cb6-35" tabindex="-1"></a><span class="co">#&gt;   Max |SMD|         0.2956        0.0284</span></span>
 <span id="cb6-36"><a href="#cb6-36" tabindex="-1"></a><span class="co">#&gt;   (* indicates |SMD| &gt; 0.10)</span></span>
 <span id="cb6-37"><a href="#cb6-37" tabindex="-1"></a><span class="co">#&gt; </span></span>
 <span id="cb6-38"><a href="#cb6-38" tabindex="-1"></a><span class="co">#&gt; Transformed Covariate Balance (|SMD|)</span></span>
 <span id="cb6-39"><a href="#cb6-39" tabindex="-1"></a><span class="co">#&gt; ------------------------------------------------------------ </span></span>
 <span id="cb6-40"><a href="#cb6-40" tabindex="-1"></a><span class="co">#&gt;   Transform     Unweighted      Weighted</span></span>
 <span id="cb6-41"><a href="#cb6-41" tabindex="-1"></a><span class="co">#&gt;   ----------  ------------  ------------</span></span>
-<span id="cb6-42"><a href="#cb6-42" tabindex="-1"></a><span class="co">#&gt;   X1^2            0.1986 *        0.0282</span></span>
-<span id="cb6-43"><a href="#cb6-43" tabindex="-1"></a><span class="co">#&gt;   X2^2              0.0410        0.0679</span></span>
-<span id="cb6-44"><a href="#cb6-44" tabindex="-1"></a><span class="co">#&gt;   X5^2              0.0206        0.0551</span></span>
-<span id="cb6-45"><a href="#cb6-45" tabindex="-1"></a><span class="co">#&gt;   X1*X2             0.0192        0.0353</span></span>
-<span id="cb6-46"><a href="#cb6-46" tabindex="-1"></a><span class="co">#&gt;   X1*X5             0.0286        0.0128</span></span>
-<span id="cb6-47"><a href="#cb6-47" tabindex="-1"></a><span class="co">#&gt;   Beta(X1)        0.7198 *        0.0399</span></span>
-<span id="cb6-48"><a href="#cb6-48" tabindex="-1"></a><span class="co">#&gt;   Beta(X5)          0.0206        0.0081</span></span>
+<span id="cb6-42"><a href="#cb6-42" tabindex="-1"></a><span class="co">#&gt;   X1^2            0.2904 *        0.0259</span></span>
+<span id="cb6-43"><a href="#cb6-43" tabindex="-1"></a><span class="co">#&gt;   X2^2              0.0941        0.0322</span></span>
+<span id="cb6-44"><a href="#cb6-44" tabindex="-1"></a><span class="co">#&gt;   X5^2              0.0841        0.0694</span></span>
+<span id="cb6-45"><a href="#cb6-45" tabindex="-1"></a><span class="co">#&gt;   X1*X2           0.1303 *        0.0144</span></span>
+<span id="cb6-46"><a href="#cb6-46" tabindex="-1"></a><span class="co">#&gt;   X1*X5             0.0573        0.0582</span></span>
+<span id="cb6-47"><a href="#cb6-47" tabindex="-1"></a><span class="co">#&gt;   Beta(X1)        0.6847 *        0.0347</span></span>
+<span id="cb6-48"><a href="#cb6-48" tabindex="-1"></a><span class="co">#&gt;   Beta(X5)          0.0289        0.0138</span></span>
 <span id="cb6-49"><a href="#cb6-49" tabindex="-1"></a><span class="co">#&gt;   ----------  ------------  ------------</span></span>
-<span id="cb6-50"><a href="#cb6-50" tabindex="-1"></a><span class="co">#&gt;   Max |SMD|         0.7198        0.0679</span></span>
+<span id="cb6-50"><a href="#cb6-50" tabindex="-1"></a><span class="co">#&gt;   Max |SMD|         0.6847        0.0694</span></span>
 <span id="cb6-51"><a href="#cb6-51" tabindex="-1"></a><span class="co">#&gt; </span></span>
 <span id="cb6-52"><a href="#cb6-52" tabindex="-1"></a><span class="co">#&gt; Effective Sample Size</span></span>
 <span id="cb6-53"><a href="#cb6-53" tabindex="-1"></a><span class="co">#&gt; ------------------------------------------------------------ </span></span>
-<span id="cb6-54"><a href="#cb6-54" tabindex="-1"></a><span class="co">#&gt;   Treated: 217 / 299  (73%)</span></span>
-<span id="cb6-55"><a href="#cb6-55" tabindex="-1"></a><span class="co">#&gt;   Control: 348 / 501  (69%)</span></span>
+<span id="cb6-54"><a href="#cb6-54" tabindex="-1"></a><span class="co">#&gt;   Treated: 191 / 275  (70%)</span></span>
+<span id="cb6-55"><a href="#cb6-55" tabindex="-1"></a><span class="co">#&gt;   Control: 394 / 525  (75%)</span></span>
 <span id="cb6-56"><a href="#cb6-56" tabindex="-1"></a><span class="co">#&gt; </span></span>
 <span id="cb6-57"><a href="#cb6-57" tabindex="-1"></a><span class="co">#&gt; Energy Distance</span></span>
 <span id="cb6-58"><a href="#cb6-58" tabindex="-1"></a><span class="co">#&gt; ------------------------------------------------------------ </span></span>
-<span id="cb6-59"><a href="#cb6-59" tabindex="-1"></a><span class="co">#&gt;   Unweighted: 0.0392</span></span>
-<span id="cb6-60"><a href="#cb6-60" tabindex="-1"></a><span class="co">#&gt;   Weighted:   0.0133</span></span>
+<span id="cb6-59"><a href="#cb6-59" tabindex="-1"></a><span class="co">#&gt;   Unweighted: 0.0486</span></span>
+<span id="cb6-60"><a href="#cb6-60" tabindex="-1"></a><span class="co">#&gt;   Weighted:   0.0144</span></span>
 <span id="cb6-61"><a href="#cb6-61" tabindex="-1"></a><span class="co">#&gt; ============================================================</span></span></code></pre></div>
 <p>We can use <code>compute_balance()</code> to compare all methods on
 the same terms:</p>
@@ -549,31 +549,31 @@ the same terms:</p>
 <tbody>
 <tr class="odd">
 <td align="left">Unweighted</td>
-<td align="right">0.2476</td>
-<td align="right">0.7198</td>
+<td align="right">0.2956</td>
+<td align="right">0.6847</td>
 <td align="left">100%</td>
 <td align="left">100%</td>
 </tr>
 <tr class="even">
 <td align="left">Entropy balancing</td>
 <td align="right">0.0000</td>
-<td align="right">0.6706</td>
-<td align="left">95%</td>
+<td align="right">0.6213</td>
+<td align="left">93%</td>
 <td align="left">98%</td>
 </tr>
 <tr class="odd">
 <td align="left">Energy balancing</td>
-<td align="right">0.0064</td>
-<td align="right">0.5568</td>
+<td align="right">0.0074</td>
+<td align="right">0.4879</td>
+<td align="left">84%</td>
 <td align="left">87%</td>
-<td align="left">88%</td>
 </tr>
 <tr class="even">
 <td align="left">Forest balance</td>
-<td align="right">0.0322</td>
-<td align="right">0.0679</td>
-<td align="left">73%</td>
-<td align="left">69%</td>
+<td align="right">0.0284</td>
+<td align="right">0.0694</td>
+<td align="left">70%</td>
+<td align="left">75%</td>
 </tr>
 </tbody>
 </table>
@@ -712,16 +712,17 @@ reflecting the advantage of its confounding-targeted kernel.</p>
 <span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a></span>
 <span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a><span class="co"># 3. Build sparse proximity kernel</span></span>
 <span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a>K <span class="ot">&lt;-</span> <span class="fu">leaf_node_kernel</span>(leaf_mat)</span>
-<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Kernel:&quot;</span>, <span class="fu">round</span>(<span class="dv">100</span> <span class="sc">*</span> <span class="fu">length</span>(K<span class="sc">@</span>x) <span class="sc">/</span> <span class="fu">prod</span>(<span class="fu">dim</span>(K)), <span class="dv">1</span>), <span class="st">&quot;% nonzero</span><span class="sc">\n</span><span class="st">&quot;</span>)</span>
-<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a><span class="co">#&gt; Kernel: 31.2 % nonzero</span></span>
-<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a></span>
-<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a><span class="co"># 4. Compute balancing weights</span></span>
-<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a>bal <span class="ot">&lt;-</span> <span class="fu">kernel_balance</span>(dat<span class="sc">$</span>A, K)</span>
-<span id="cb9-21"><a href="#cb9-21" tabindex="-1"></a></span>
-<span id="cb9-22"><a href="#cb9-22" tabindex="-1"></a><span class="co"># 5. Estimate ATE</span></span>
-<span id="cb9-23"><a href="#cb9-23" tabindex="-1"></a><span class="fu">weighted.mean</span>(dat<span class="sc">$</span>Y[dat<span class="sc">$</span>A <span class="sc">==</span> <span class="dv">1</span>], bal<span class="sc">$</span>weights[dat<span class="sc">$</span>A <span class="sc">==</span> <span class="dv">1</span>]) <span class="sc">-</span></span>
-<span id="cb9-24"><a href="#cb9-24" tabindex="-1"></a>  <span class="fu">weighted.mean</span>(dat<span class="sc">$</span>Y[dat<span class="sc">$</span>A <span class="sc">==</span> <span class="dv">0</span>], bal<span class="sc">$</span>weights[dat<span class="sc">$</span>A <span class="sc">==</span> <span class="dv">0</span>])</span>
-<span id="cb9-25"><a href="#cb9-25" tabindex="-1"></a><span class="co">#&gt; [1] 0.3063087</span></span></code></pre></div>
+<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a><span class="fu">c</span>(<span class="st">&quot;kernel % nonzero&quot;</span> <span class="ot">=</span> <span class="fu">round</span>(<span class="dv">100</span> <span class="sc">*</span> <span class="fu">length</span>(K<span class="sc">@</span>x) <span class="sc">/</span> <span class="fu">prod</span>(<span class="fu">dim</span>(K)), <span class="dv">1</span>))</span>
+<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a><span class="co">#&gt; kernel % nonzero </span></span>
+<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a><span class="co">#&gt;             31.2</span></span>
+<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a></span>
+<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a><span class="co"># 4. Compute balancing weights</span></span>
+<span id="cb9-21"><a href="#cb9-21" tabindex="-1"></a>bal <span class="ot">&lt;-</span> <span class="fu">kernel_balance</span>(dat<span class="sc">$</span>A, K)</span>
+<span id="cb9-22"><a href="#cb9-22" tabindex="-1"></a></span>
+<span id="cb9-23"><a href="#cb9-23" tabindex="-1"></a><span class="co"># 5. Estimate ATE</span></span>
+<span id="cb9-24"><a href="#cb9-24" tabindex="-1"></a><span class="fu">weighted.mean</span>(dat<span class="sc">$</span>Y[dat<span class="sc">$</span>A <span class="sc">==</span> <span class="dv">1</span>], bal<span class="sc">$</span>weights[dat<span class="sc">$</span>A <span class="sc">==</span> <span class="dv">1</span>]) <span class="sc">-</span></span>
+<span id="cb9-25"><a href="#cb9-25" tabindex="-1"></a>  <span class="fu">weighted.mean</span>(dat<span class="sc">$</span>Y[dat<span class="sc">$</span>A <span class="sc">==</span> <span class="dv">0</span>], bal<span class="sc">$</span>weights[dat<span class="sc">$</span>A <span class="sc">==</span> <span class="dv">0</span>])</span>
+<span id="cb9-26"><a href="#cb9-26" tabindex="-1"></a><span class="co">#&gt; [1] 0.3063087</span></span></code></pre></div>
 </div>
 
 
