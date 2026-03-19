@@ -23,6 +23,7 @@ Imports:
     Matrix,
     Rcpp
 Suggests:
+    ggplot2,
     knitr,
     osqp,
     rmarkdown,

@@ -10,3 +10,10 @@ src/*.o
 src/*.so
 src/*.dll
 src/*.bak
+
+README_cache/
+README.html
+
+vignettes/*_cache/
+vignettes/*_files/
+vignettes/*.html

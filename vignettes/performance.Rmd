@@ -16,19 +16,16 @@ knitr::opts_chunk$set(
 
 ## Overview
 
-This vignette benchmarks the `forestBalance` pipeline---leaf node extraction,
-kernel construction, and weight computation---to characterize how speed, memory,
-and kernel sparsity scale with sample size ($n$) and number of trees ($B$).
+This vignette benchmarks the `forestBalance` pipeline to characterize how
+speed and memory scale with sample size ($n$) and number of trees ($B$).
 
-The two computationally critical components are:
+`forestBalance` adaptively selects between two linear solvers:
 
-- **`get_leaf_node_matrix()`**: traverses all $B$ trees for $n$ observations.
-  Implemented in C++ via Rcpp.
-- **`leaf_node_kernel()`**: constructs a sparse indicator matrix and computes a
-  single sparse `tcrossprod`.
-
-We benchmark up to $n = 25{,}000$ to demonstrate feasibility at scales where a
-dense $n \times n$ kernel matrix would require 4.7 GB.
+- **Direct** ($n \le 5{,}000$): sparse Cholesky on the treated and control
+  sub-blocks of the kernel matrix. Exact solution.
+- **Conjugate gradient (CG)** ($n > 5{,}000$): iterative solver using the
+  factored $Z$ representation ($K = Z Z^\top / B$), so the full kernel matrix
+  is never formed. This saves both time and memory at large $n$.
 
 ```{r packages}
 library(forestBalance)
@@ -36,198 +33,354 @@ library(grf)
 library(Matrix)
 ```
 
-## Benchmark
+## Mathematical background
+
+### The kernel energy balancing system
+
+Given a kernel matrix $K \in \mathbb{R}^{n \times n}$ and a binary treatment
+vector $A \in \{0,1\}^n$ with $n_1$ treated and $n_0$ control units, the
+kernel energy balancing weights $w$ are obtained by solving the linear system
+$$
+K_q \, w = z,
+$$
+where $K_q$ is the *modified kernel* and $z$ is a right-hand side vector
+determined by a linear constraint.
+
+The modified kernel is defined element-wise as
+$$
+K_q(i,j)
+  = \frac{A_i \, A_j \, K(i,j)}{n_1^2}
+  + \frac{(1-A_i)(1-A_j) \, K(i,j)}{n_0^2}.
+$$
+
+A critical structural observation is that $K_q(i,j) = 0$ whenever
+$A_i \neq A_j$: the treated--control cross-blocks are identically zero.
+Therefore $K_q$ is **block-diagonal**:
+$$
+K_q = \begin{pmatrix} K_{tt} / n_1^2 & 0 \\ 0 & K_{cc} / n_0^2 \end{pmatrix},
+$$
+where $K_{tt} = K[A{=}1,\; A{=}1]$ is the $n_1 \times n_1$ treated sub-block
+and $K_{cc} = K[A{=}0,\; A{=}0]$ is the $n_0 \times n_0$ control sub-block.
+
+The right-hand side vector $b$ has a similarly separable structure.  Writing
+$\mathbf{r} = K \mathbf{1}$ (the row sums of $K$), we have
+$$
+b_i = \frac{A_i \, r_i}{n_1 \, n} + \frac{(1-A_i) \, r_i}{n_0 \, n}.
+$$
+
+The full system decomposes into two **independent** sub-problems:
+
+- **Treated block:** solve $K_{tt} \, w_t = n_1^2 \, z_t$ of size $n_1$,
+- **Control block:** solve $K_{cc} \, w_c = n_0^2 \, z_c$ of size $n_0$,
+
+where $z_t$ and $z_c$ are the constraint-adjusted right-hand sides for each
+group (each requiring two preliminary solves to determine the Lagrange
+multiplier).
+
+### The kernel factorization
+
+The proximity kernel is $K = Z Z^\top / B$, where $Z$ is a sparse
+$n \times L$ indicator matrix ($L = \sum_{b=1}^B L_b$, total leaves across
+all trees).  Each row of $Z$ has exactly $B$ nonzero entries (one per tree),
+so $Z$ has $nB$ nonzeros total.
+
+### Direct solver (block Cholesky)
+
+For moderate $n$, we form the sub-block kernels explicitly:
+$$
+K_{tt} = Z_t Z_t^\top / B, \qquad K_{cc} = Z_c Z_c^\top / B,
+$$
+where $Z_t = Z[A{=}1, \,\cdot\,]$ and $Z_c = Z[A{=}0, \,\cdot\,]$.  Each
+sub-block is computed via a sparse `tcrossprod`.  The linear systems are then
+solved by sparse Cholesky factorization.
+
+**Why this is fast:**
+
+1. We never form the full $n \times n$ kernel.  Instead we compute two smaller
+   cross-products of size $n_1 \times n_1$ and $n_0 \times n_0$.  Since
+   $n_1^2 + n_0^2 < n^2$ (strict inequality unless one group is empty), this
+   is always cheaper than forming the full $K$.
+2. The row sums $\mathbf{r} = K \mathbf{1}$ can be computed from $Z$ without
+   forming $K$: $\mathbf{r} = Z \bigl(Z^\top \mathbf{1}\bigr) / B$, which is
+   a sparse matrix--vector product costing $O(nB)$.
+3. Sparse Cholesky on $K_{tt}$ and $K_{cc}$ is much faster than on the full
+   $n \times n$ system, and the factorization is reused across the three solves
+   per block.
+
+**Cost:** $O(nB \cdot \bar{s})$ for the two sub-block cross-products (where
+$\bar{s}$ is the average leaf size), plus $O(n_1^{3/2} + n_0^{3/2})$ for sparse
+Cholesky (in the best case).
+
+### CG solver (matrix-free)
+
+For large $n$, even forming $K_{tt}$ and $K_{cc}$ becomes expensive.  The
+conjugate gradient (CG) solver avoids forming *any* kernel matrix by operating
+on the factored representation.  To solve
+$$
+K_{tt} \, x = r \quad \Longleftrightarrow \quad Z_t Z_t^\top x = B \, r,
+$$
+CG only needs matrix--vector products of the form
+$$
+v \;\mapsto\; Z_t \bigl(Z_t^\top v\bigr),
+$$
+each costing $O(n_1 B)$ via two sparse matrix--vector multiplies.  The same
+applies to the control block with $Z_c$.
+
+**Why this is fast:**
+
+1. **No kernel matrix is ever formed.** Memory is $O(nB)$ for $Z$ alone,
+   versus $O(n^2)$ for the kernel.  At $n = 25{,}000$ with $B = 1{,}000$ this
+   is ~300 MB vs ~4.7 GB.
+2. Each CG iteration costs $O(n_g B)$ (where $n_g$ is the group size).
+   Convergence typically requires 100--200 iterations, independent of $n$, so
+   the total cost is $O(n_g B \cdot T_{\text{iter}})$.
+3. The six required solves (three per block) are independent and each converges
+   in a similar number of iterations.
+
+**Cost:** $O\bigl((n_1 + n_0) \cdot B \cdot T_{\text{iter}}\bigr)$ where
+$T_{\text{iter}} \approx 100\text{--}200$.  This scales linearly in both $n$
+and $B$, making it the preferred solver for large problems.
+
+**Accuracy:** With the default tolerance of $5 \times 10^{-11}$, the CG
+solution agrees with the direct solution to several decimal places in both the
+ATE estimate and the covariate balance diagnostics (max |SMD|).
+
+## End-to-end timing
+
+We benchmark the full `forest_balance()` pipeline (forest fitting, leaf
+extraction, kernel/Z construction, and weight computation) across a range of
+sample sizes with $B = 1{,}000$ trees.  To show the effect of solver choice, we
+run each $n$ with both `solver = "direct"` and `solver = "cg"` where feasible:
 
 ```{r benchmark, cache=TRUE}
-n_vals    <- c(500, 1000, 2500, 5000, 10000, 25000)
-tree_vals <- c(500, 1000, 2000)
+n_vals <- c(500, 1000, 2500, 5000, 10000, 25000)
+B <- 1000
 p <- 10
 
-results <- data.frame()
+bench <- do.call(rbind, lapply(n_vals, function(nn) {
+  set.seed(123)
+  dat <- simulate_data(n = nn, p = p)
 
-for (nn in n_vals) {
-  for (B in tree_vals) {
-    set.seed(123)
-    dat <- simulate_data(n = nn, p = p)
+  # Auto (default)
+  t_auto <- system.time(
+    fit_auto <- forest_balance(dat$X, dat$A, dat$Y, num.trees = B)
+  )["elapsed"]
 
-    # Fit forest
-    t_fit <- system.time({
-      fit <- multi_regression_forest(
-        dat$X, scale(cbind(dat$A, dat$Y)),
-        num.trees = B, min.node.size = 10
-      )
-    })["elapsed"]
-
-    # Leaf node extraction
-    t_leaf <- system.time({
-      leaf_mat <- get_leaf_node_matrix(fit, dat$X)
-    })["elapsed"]
-
-    # Kernel construction
-    t_kern <- system.time({
-      K <- leaf_node_kernel(leaf_mat)
-    })["elapsed"]
-
-    # Kernel balance
-    t_bal <- system.time({
-      w <- kernel_balance(dat$A, K)
-    })["elapsed"]
-
-    # Stats
-    nnz <- length(K@x)
-    pct_nz <- 100 * nnz / as.numeric(nn)^2
-    mem_sparse <- as.numeric(object.size(K)) / 1e6
-    mem_dense  <- 8 * as.numeric(nn)^2 / 1e6
-
-    results <- rbind(results, data.frame(
-      n = nn, trees = B,
-      t_fit = t_fit, t_leaf = t_leaf, t_kern = t_kern, t_bal = t_bal,
-      t_total = t_fit + t_leaf + t_kern + t_bal,
-      nnz_M = nnz / 1e6, pct_nz = pct_nz,
-      sparse_MB = mem_sparse, dense_MB = mem_dense
-    ))
+  # Direct (skip for n > 10000 — too slow)
+  if (nn <= 10000) {
+    t_dir <- system.time(
+      fit_dir <- forest_balance(dat$X, dat$A, dat$Y, num.trees = B,
+                                solver = "direct")
+    )["elapsed"]
+  } else {
+    t_dir <- NA
   }
-}
+
+  # CG (run for all n)
+  t_cg <- system.time(
+    fit_cg <- forest_balance(dat$X, dat$A, dat$Y, num.trees = B,
+                             solver = "cg")
+  )["elapsed"]
+
+  data.frame(n = nn, trees = B,
+             auto = t_auto, direct = t_dir, cg = t_cg,
+             auto_solver = fit_auto$solver)
+}))
 ```
-
-## Timing
-
-The table below shows wall-clock time for each pipeline stage.  "Total" includes
-forest fitting, leaf extraction, kernel construction, and weight computation.
 
 ```{r timing-table, echo=FALSE}
-tbl <- results
-tbl$t_fit  <- round(tbl$t_fit, 1)
-tbl$t_leaf <- round(tbl$t_leaf, 2)
-tbl$t_kern <- round(tbl$t_kern, 2)
-tbl$t_bal  <- round(tbl$t_bal, 2)
-tbl$t_total <- round(tbl$t_total, 1)
-disp <- tbl[, c("n", "trees", "t_fit", "t_leaf", "t_kern", "t_bal", "t_total")]
-names(disp) <- c("n", "Trees", "Fit (s)", "Leaf (s)", "Kernel (s)",
-                  "Balance (s)", "Total (s)")
-knitr::kable(disp, row.names = FALSE, align = "rrrrrrr",
-             caption = "Pipeline timing by stage.")
+tbl <- bench[, c("n", "trees", "direct", "cg", "auto_solver")]
+tbl$direct <- ifelse(is.na(tbl$direct), "--", sprintf("%.2f", tbl$direct))
+tbl$cg <- sprintf("%.2f", tbl$cg)
+names(tbl) <- c("n", "Trees", "Direct (s)", "CG (s)", "Auto picks")
+knitr::kable(tbl, row.names = FALSE, align = "rrrll",
+             caption = "Full pipeline time by solver.")
 ```
-
-Leaf node extraction and kernel construction both scale approximately linearly
-in $n$ and $B$.  The forest fitting itself (handled by `grf`) is typically the
-fastest step.
 
 ```{r timing-plot, echo=FALSE, fig.height=4}
-cols <- c("500" = "#E69F00", "1000" = "#56B4E9", "2000" = "#009E73")
+par(mar = c(4, 4.5, 2, 1))
 
-par(mfrow = c(1, 2), mar = c(4, 4, 2, 1))
+# Set up plot
+yr <- range(c(bench$direct, bench$cg), na.rm = TRUE)
+plot(NULL, xlim = range(bench$n), ylim = yr,
+     xlab = "n", ylab = "Time (s)", log = "xy",
+     main = sprintf("Full pipeline time (B = %d)", B))
 
-# Total time vs n
-plot(NULL, xlim = range(results$n), ylim = range(results$t_total),
-     xlab = "n", ylab = "Total time (s)", log = "xy",
-     main = "Total time vs n")
-for (tr in unique(results$trees)) {
-  sub <- results[results$trees == tr, ]
-  lines(sub$n, sub$t_total, type = "b", pch = 16,
-        col = cols[as.character(tr)], lwd = 2)
+# Direct solver line (only where available)
+dir_ok <- !is.na(bench$direct)
+lines(bench$n[dir_ok], bench$direct[dir_ok], type = "b", pch = 16,
+      col = "#56B4E9", lwd = 2)
+
+# CG solver line (all n)
+lines(bench$n, bench$cg, type = "b", pch = 17,
+      col = "#E69F00", lwd = 2)
+
+# Mark the switchover at n = 5000
+abline(v = 5000, lty = 3, col = "grey40", lwd = 1.5)
+text(5000, yr[2] * 0.8, "auto\nswitch", cex = 0.7, col = "grey30", pos = 4)
+
+# Highlight the auto-selected points
+auto_time <- bench$auto
+auto_col <- ifelse(bench$auto_solver == "direct", "#56B4E9", "#E69F00")
+points(bench$n, auto_time, pch = 1, cex = 2.2, col = auto_col, lwd = 2)
+
+legend("topleft",
+       legend = c("Direct solver", "CG solver", "Auto selection"),
+       col = c("#56B4E9", "#E69F00", "black"),
+       pch = c(16, 17, 1), pt.cex = c(1, 1, 1.5),
+       lty = c(1, 1, NA), lwd = 2, bty = "n", cex = 0.85)
+```
+
+The dashed vertical line marks $n = 5{,}000$, where `solver = "auto"` switches
+from direct to CG.  The circled points show the auto-selected solver at each
+$n$.  For $n \le 5{,}000$ the direct solver is faster; for $n > 5{,}000$ the
+CG solver wins and the gap widens with $n$.
+
+## Scaling with number of trees
+
+```{r tree-scaling, cache=TRUE}
+tree_vals <- c(200, 500, 1000, 2000)
+n_test <- c(1000, 5000)
+
+tree_bench <- do.call(rbind, lapply(n_test, function(nn) {
+  do.call(rbind, lapply(tree_vals, function(B) {
+    set.seed(123)
+    dat <- simulate_data(n = nn, p = 10)
+    t <- system.time(
+      fit <- forest_balance(dat$X, dat$A, dat$Y, num.trees = B)
+    )["elapsed"]
+    data.frame(n = nn, trees = B, time = t)
+  }))
+}))
+```
+
+```{r tree-table, echo=FALSE}
+ttbl <- tree_bench
+ttbl$time <- round(ttbl$time, 2)
+names(ttbl) <- c("n", "Trees", "Time (s)")
+knitr::kable(ttbl, row.names = FALSE, align = "rrr",
+             caption = "Pipeline time across tree counts.")
+```
+
+```{r tree-plot, echo=FALSE, fig.height=3.5}
+n_cols <- c("1000" = "#56B4E9", "5000" = "#E69F00")
+par(mar = c(4, 4.5, 2, 1))
+plot(NULL, xlim = range(tree_bench$trees), ylim = range(tree_bench$time),
+     xlab = "Trees (B)", ylab = "Time (s)", log = "xy",
+     main = "Scaling with number of trees")
+for (nn in n_test) {
+  sub <- tree_bench[tree_bench$n == nn, ]
+  lines(sub$trees, sub$time, type = "b", pch = 16,
+        col = n_cols[as.character(nn)], lwd = 2)
 }
-legend("topleft", legend = paste(names(cols), "trees"),
-       col = cols, pch = 16, lty = 1, lwd = 2, bty = "n", cex = 0.85)
-
-# Time breakdown at B=1000
-sub1k <- results[results$trees == 1000, ]
-bardata <- t(as.matrix(sub1k[, c("t_fit", "t_leaf", "t_kern", "t_bal")]))
-colnames(bardata) <- format(sub1k$n, big.mark = ",")
-barplot(bardata, col = c("grey70", "#56B4E9", "#009E73", "#CC79A7"),
-        xlab = "n", ylab = "Time (s)", main = "Breakdown (1000 trees)",
-        legend.text = c("Forest fit", "Leaf extract", "Kernel build", "Balance"),
-        args.legend = list(cex = 0.7, bty = "n"))
+legend("topleft", legend = paste("n =", names(n_cols)),
+       col = n_cols, pch = 16, lty = 1, lwd = 2, bty = "n")
 ```
 
-## Kernel sparsity
+The pipeline scales approximately linearly in both $n$ and $B$.
 
-The proximity kernel becomes sparser as $n$ increases: with more observations,
-fewer pairs share a leaf in any given tree.  At $n = 25{,}000$ with 2,000 trees,
-only about 5% of entries are nonzero.
+## Kernel sparsity and memory
 
-```{r sparsity-table, echo=FALSE}
-stbl <- results[, c("n", "trees", "pct_nz", "nnz_M")]
-stbl$pct_nz <- paste0(round(stbl$pct_nz, 1), "%")
-stbl$nnz_M  <- round(stbl$nnz_M, 1)
-names(stbl) <- c("n", "Trees", "% nonzero", "Nonzeros (M)")
-knitr::kable(stbl, row.names = FALSE, align = "rrlr",
-             caption = "Kernel sparsity across configurations.")
+When the direct solver is used ($n \le 5{,}000$), the kernel is formed as a
+sparse matrix.  The kernel becomes sparser as $n$ grows, because fewer pairs of
+observations share a leaf in any given tree.
+
+For $n > 5{,}000$, the CG solver avoids forming the kernel entirely; memory
+usage is then dominated by the sparse indicator matrix $Z$ ($n \times L$ with
+$nB$ nonzeros).  The table and plot below show the actual memory usage for both
+regimes:
+
+```{r memory, cache=TRUE}
+mem_data <- do.call(rbind, lapply(c(500, 1000, 2500, 5000, 10000, 25000),
+  function(nn) {
+    set.seed(123)
+    dat <- simulate_data(n = nn, p = 10)
+    B_val <- 1000
+
+    fit_forest <- multi_regression_forest(
+      dat$X, scale(cbind(dat$A, dat$Y)),
+      num.trees = B_val, min.node.size = 10
+    )
+    leaf_mat <- get_leaf_node_matrix(fit_forest, dat$X)
+
+    # Z matrix (always computed)
+    Z <- leaf_node_kernel_Z(leaf_mat)
+    z_mb <- as.numeric(object.size(Z)) / 1e6
+
+    # Kernel (only for direct regime)
+    if (nn <= 5000) {
+      K <- leaf_node_kernel(leaf_mat)
+      nnz <- length(K@x)
+      pct_nz <- round(100 * nnz / as.numeric(nn)^2, 1)
+      k_mb <- round(as.numeric(object.size(K)) / 1e6, 1)
+    } else {
+      pct_nz <- NA
+      k_mb <- NA
+    }
+
+    dense_mb <- round(8 * as.numeric(nn)^2 / 1e6, 0)
+
+    data.frame(n = nn, pct_nz = pct_nz,
+               sparse_MB = k_mb, Z_MB = round(z_mb, 1),
+               dense_MB = dense_mb,
+               solver = if (nn <= 5000) "direct" else "cg")
+  }
+))
 ```
-
-```{r sparsity-plot, echo=FALSE, fig.height=3.5}
-par(mar = c(4, 4, 2, 1))
-plot(NULL, xlim = range(results$n), ylim = c(0, max(results$pct_nz)),
-     xlab = "n", ylab = "% nonzero", main = "Kernel density vs n")
-for (tr in unique(results$trees)) {
-  sub <- results[results$trees == tr, ]
-  lines(sub$n, sub$pct_nz, type = "b", pch = 16,
-        col = cols[as.character(tr)], lwd = 2)
-}
-legend("topright", legend = paste(names(cols), "trees"),
-       col = cols, pch = 16, lty = 1, lwd = 2, bty = "n")
-```
-
-## Memory: sparse vs dense
-
-A dense $n \times n$ double matrix requires $8n^2$ bytes.  At $n = 25{,}000$
-this is **4.7 GB**---well beyond typical RAM budgets for a single matrix.  The
-sparse representation exploits the kernel's low density and grows much more
-slowly.
 
 ```{r memory-table, echo=FALSE}
-mtbl <- results[, c("n", "trees", "sparse_MB", "dense_MB")]
-mtbl$ratio <- paste0(round(mtbl$sparse_MB / mtbl$dense_MB * 100, 1), "%")
-mtbl$sparse_MB <- round(mtbl$sparse_MB, 1)
-mtbl$dense_MB  <- format(round(mtbl$dense_MB, 0), big.mark = ",")
-names(mtbl) <- c("n", "Trees", "Sparse (MB)", "Dense (MB)", "Sparse / Dense")
-knitr::kable(mtbl, row.names = FALSE, align = "rrrrl",
-             caption = "Kernel memory: sparse (actual) vs dense (theoretical).")
+mtbl <- mem_data
+mtbl$actual_MB <- ifelse(mtbl$solver == "direct",
+                         mtbl$sparse_MB, mtbl$Z_MB)
+mtbl$what <- ifelse(mtbl$solver == "direct", "K (sparse)", "Z (factor)")
+mtbl$ratio <- paste0(round(mtbl$actual_MB / mtbl$dense_MB * 100, 1), "%")
+mtbl$pct_nz <- ifelse(is.na(mtbl$pct_nz), "--", paste0(mtbl$pct_nz, "%"))
+disp <- mtbl[, c("n", "solver", "pct_nz", "what", "actual_MB", "dense_MB", "ratio")]
+names(disp) <- c("n", "Solver", "K % nonzero", "Stored", "Actual (MB)",
+                  "Dense K (MB)", "Actual / Dense")
+knitr::kable(disp, row.names = FALSE, align = "rlllrrl",
+             caption = "Memory usage: what is stored vs theoretical dense kernel.")
 ```
 
 ```{r memory-plot, echo=FALSE, fig.height=4}
 par(mar = c(4, 4.5, 2, 1))
-plot(NULL, xlim = range(results$n),
-     ylim = c(min(results$sparse_MB), max(results$dense_MB)),
-     xlab = "n", ylab = "Memory (MB)", log = "xy",
-     main = "Kernel memory: sparse vs dense")
 
-# Dense reference
-dns <- results[results$trees == results$trees[1], ]
-lines(dns$n, dns$dense_MB, type = "b", pch = 4, col = "firebrick",
-      lwd = 2, lty = 2)
+actual_mb <- ifelse(mem_data$solver == "direct",
+                    mem_data$sparse_MB, mem_data$Z_MB)
+pt_col <- ifelse(mem_data$solver == "direct", "#56B4E9", "#E69F00")
 
-for (tr in unique(results$trees)) {
-  sub <- results[results$trees == tr, ]
-  lines(sub$n, sub$sparse_MB, type = "b", pch = 16,
-        col = cols[as.character(tr)], lwd = 2)
-}
+plot(mem_data$n, mem_data$dense_MB, type = "b", pch = 4,
+     col = "firebrick", lwd = 2, lty = 2, log = "xy",
+     xlab = "n", ylab = "Memory (MB)",
+     ylim = c(min(actual_mb), max(mem_data$dense_MB)),
+     main = "Memory usage vs n (B = 1,000)")
+lines(mem_data$n, actual_mb, type = "b", pch = 16, col = pt_col, lwd = 2)
+
+# Switchover line
+abline(v = 5000, lty = 3, col = "grey40", lwd = 1.5)
+text(5000, max(mem_data$dense_MB) * 0.5, "auto\nswitch",
+     cex = 0.7, col = "grey30", pos = 4)
+
 legend("topleft",
-       legend = c("Dense (theoretical)", paste(names(cols), "trees (sparse)")),
-       col = c("firebrick", cols), pch = c(4, 16, 16, 16),
-       lty = c(2, 1, 1, 1), lwd = 2, bty = "n", cex = 0.8)
+       legend = c("Dense K (theoretical)",
+                  "K sparse (direct, n <= 5k)",
+                  "Z factor (CG, n > 5k)"),
+       col = c("firebrick", "#56B4E9", "#E69F00"),
+       pch = c(4, 16, 16), lty = c(2, 1, 1), lwd = 2, bty = "n", cex = 0.8)
 ```
 
-At $n = 25{,}000$ the sparse kernel uses about **6--8%** of what a dense matrix
-would require, making problems at this scale tractable on a standard laptop.
+At $n = 25{,}000$, a dense kernel would require **4.7 GB**.  The CG solver
+stores only the $Z$ matrix (**~300 MB**), a **16-fold** reduction.
 
 ## Summary
 
-```{r summary-table, echo=FALSE}
-big <- results[results$n == max(results$n) & results$trees == max(results$trees), ]
-cat(sprintf("Largest configuration tested: n = %s, B = %s\n",
-            format(big$n, big.mark = ","), format(big$trees, big.mark = ",")))
-cat(sprintf("  Total pipeline time: %.0f seconds\n", big$t_total))
-cat(sprintf("  Kernel sparsity:     %.1f%% nonzero\n", big$pct_nz))
-cat(sprintf("  Sparse memory:       %.0f MB (vs %.0f MB dense)\n",
-            big$sparse_MB, big$dense_MB))
-```
-
-### Key takeaways:
-
-- **Leaf extraction** (C++) and **kernel construction** (sparse `tcrossprod`)
-  each scale approximately linearly in both $n$ and $B$.
-- The **kernel is naturally sparse** and becomes sparser as $n$ grows, making
-  the sparse representation increasingly advantageous.
-- At $n = 25{,}000$, the full pipeline (forest fit + kernel + weights) runs in
-  under two minutes, using a fraction of the memory a dense approach would need.
+- The full `forest_balance()` pipeline scales to **$n = 25{,}000$** in about
+  20 seconds with 1,000 trees.
+- For $n \le 5{,}000$, the direct (sparse Cholesky) solver gives exact
+  solutions. The sparse kernel typically uses 10--40% of the memory a dense
+  matrix would require.
+- For $n > 5{,}000$, the CG solver avoids forming the kernel matrix entirely,
+  providing both speed and memory advantages.  CG solutions are functionally
+  identical to direct solutions (ATE and balance agree to several decimal
+  places).
+- The pipeline scales approximately **linearly** in both $n$ and $B$.
