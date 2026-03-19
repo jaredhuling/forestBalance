@@ -94,26 +94,14 @@ where $Z_t = Z[A{=}1, \,\cdot\,]$ and $Z_c = Z[A{=}0, \,\cdot\,]$.  Each
 sub-block is computed via a sparse `tcrossprod`.  The linear systems are then
 solved by sparse Cholesky factorization.
 
-**Why this is fast:**
 
-1. We never form the full $n \times n$ kernel.  Instead we compute two smaller
-   cross-products of size $n_1 \times n_1$ and $n_0 \times n_0$.  Since
-   $n_1^2 + n_0^2 < n^2$ (strict inequality unless one group is empty), this
-   is always cheaper than forming the full $K$.
-2. The row sums $\mathbf{r} = K \mathbf{1}$ can be computed from $Z$ without
-   forming $K$: $\mathbf{r} = Z \bigl(Z^\top \mathbf{1}\bigr) / B$, which is
-   a sparse matrix--vector product costing $O(nB)$.
-3. Sparse Cholesky on $K_{tt}$ and $K_{cc}$ is much faster than on the full
-   $n \times n$ system, and the factorization is reused across the three solves
-   per block.
-
-**Cost:** $O(nB \cdot \bar{s})$ for the two sub-block cross-products (where
+**Computational Cost:** $O(nB \cdot \bar{s})$ for the two sub-block cross-products (where
 $\bar{s}$ is the average leaf size), plus $O(n_1^{3/2} + n_0^{3/2})$ for sparse
 Cholesky (in the best case).
 
 ### CG solver (matrix-free)
 
-For large $n$, even forming $K_{tt}$ and $K_{cc}$ becomes expensive.  The
+For large $n$, forming $K_{tt}$ and $K_{cc}$ becomes expensive.  The
 conjugate gradient (CG) solver avoids forming *any* kernel matrix by operating
 on the factored representation.  To solve
 $$
@@ -126,24 +114,19 @@ $$
 each costing $O(n_1 B)$ via two sparse matrix--vector multiplies.  The same
 applies to the control block with $Z_c$.
 
-**Why this is fast:**
-
-1. **No kernel matrix is ever formed.** Memory is $O(nB)$ for $Z$ alone,
-   versus $O(n^2)$ for the kernel.  At $n = 25{,}000$ with $B = 1{,}000$ this
-   is ~300 MB vs ~4.7 GB.
-2. Each CG iteration costs $O(n_g B)$ (where $n_g$ is the group size).
-   Convergence typically requires 100--200 iterations, independent of $n$, so
-   the total cost is $O(n_g B \cdot T_{\text{iter}})$.
-3. The six required solves (three per block) are independent and each converges
+Here, the memory use is $O(nB)$ for $Z$ alone,
+versus $O(n^2)$ for the kernel.  At $n = 25{,}000$ with $B = 1{,}000$ this
+is ~300 MB vs ~4.7 GB.
+Each CG iteration costs $O(n_g B)$ (where $n_g$ is the group size).
+Convergence typically requires 100--200 iterations, independent of $n$, so
+the total cost is $O(n_g B \cdot T_{\text{iter}})$.
+The six required solves (three per block) are independent and each converges
    in a similar number of iterations.
 
-**Cost:** $O\bigl((n_1 + n_0) \cdot B \cdot T_{\text{iter}}\bigr)$ where
+**Computational Cost:** $O\bigl((n_1 + n_0) \cdot B \cdot T_{\text{iter}}\bigr)$ where
 $T_{\text{iter}} \approx 100\text{--}200$.  This scales linearly in both $n$
 and $B$, making it the preferred solver for large problems.
 
-**Accuracy:** With the default tolerance of $5 \times 10^{-11}$, the CG
-solution agrees with the direct solution to several decimal places in both the
-ATE estimate and the covariate balance diagnostics (max |SMD|).
 
 ## End-to-end timing
 
