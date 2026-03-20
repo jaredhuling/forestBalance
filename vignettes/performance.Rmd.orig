@@ -7,7 +7,14 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, message = FALSE, warning = FALSE,
+  fig.width = 6.5, fig.height = 4, collapse = TRUE, comment = "#>",
+  fig.path = "performance-"
+)
+library(forestBalance)
+```
 
 ## Overview
 
@@ -26,8 +33,7 @@ The pipeline has four stages, each optimized:
    - **CG**: conjugate gradient using the factored $Z$ representation. No
      kernel matrix is formed. Preferred for large $n$ or dense kernels.
 
-
-``` r
+```{r packages}
 library(grf)
 library(Matrix)
 ```
@@ -134,8 +140,7 @@ sample sizes up to $n = 50{,}000$ with $B = 1{,}000$ trees.  To show the
 effect of solver choice, we run each $n$ with both `solver = "direct"` and
 `solver = "cg"` where feasible:
 
-
-``` r
+```{r benchmark, cache=TRUE}
 n_vals <- c(500, 1000, 2500, 5000, 10000, 25000, 50000)
 B <- 1000
 p <- 10
@@ -171,23 +176,40 @@ bench <- do.call(rbind, lapply(n_vals, function(nn) {
 }))
 ```
 
+```{r timing-table, echo=FALSE}
+tbl <- bench[, c("n", "trees", "direct", "cg", "auto_solver")]
+tbl$direct <- ifelse(is.na(tbl$direct), "--", sprintf("%.2f", tbl$direct))
+tbl$cg <- sprintf("%.2f", tbl$cg)
+names(tbl) <- c("n", "Trees", "Direct (s)", "CG (s)", "Auto picks")
+knitr::kable(tbl, row.names = FALSE, align = "rrrll",
+             caption = "Full pipeline time by solver.")
+```
 
+```{r timing-plot, echo=FALSE, fig.height=4}
+par(mar = c(4, 4.5, 2, 1))
 
-Table: Full pipeline time by solver.
+yr <- range(c(bench$direct, bench$cg), na.rm = TRUE)
+plot(NULL, xlim = range(bench$n), ylim = yr,
+     xlab = "n", ylab = "Time (s)", log = "xy",
+     main = sprintf("Full pipeline time (B = %d, p = %d)", B, p))
 
-|     n| Trees| Direct (s)|CG (s) |Auto picks |
-|-----:|-----:|----------:|:------|:----------|
-|   500|  1000|       0.08|0.22   |cg         |
-|  1000|  1000|       0.18|0.57   |direct     |
-|  2500|  1000|       0.71|1.49   |direct     |
-|  5000|  1000|       2.72|4.36   |direct     |
-| 10000|  1000|      13.54|15.53  |direct     |
-| 25000|  1000|         --|80.05  |cg         |
-| 50000|  1000|         --|187.86 |cg         |
+dir_ok <- !is.na(bench$direct)
+lines(bench$n[dir_ok], bench$direct[dir_ok], type = "b", pch = 16,
+      col = "#56B4E9", lwd = 2)
 
+lines(bench$n, bench$cg, type = "b", pch = 17,
+      col = "#E69F00", lwd = 2)
 
+auto_time <- bench$auto
+auto_col <- ifelse(bench$auto_solver == "direct", "#56B4E9", "#E69F00")
+points(bench$n, auto_time, pch = 1, cex = 2.2, col = auto_col, lwd = 2)
 
-![plot of chunk timing-plot](performance-timing-plot-1.png)
+legend("topleft",
+       legend = c("Direct solver", "CG solver", "Auto selection"),
+       col = c("#56B4E9", "#E69F00", "black"),
+       pch = c(16, 17, 1), pt.cex = c(1, 1, 1.5),
+       lty = c(1, 1, NA), lwd = 2, bty = "n", cex = 0.85)
+```
 
 The circled points show which solver `"auto"` selects at each $n$.  The
 switchover depends on both the per-fold sample size and the adaptive
@@ -195,8 +217,7 @@ switchover depends on both the per-fold sample size and the adaptive
 
 ## Scaling with number of trees
 
-
-``` r
+```{r tree-scaling, cache=TRUE}
 tree_vals <- c(200, 500, 1000, 2000)
 n_test <- c(1000, 5000, 25000)
 
@@ -212,28 +233,28 @@ tree_bench <- do.call(rbind, lapply(n_test, function(nn) {
 }))
 ```
 
+```{r tree-table, echo=FALSE}
+ttbl <- tree_bench
+ttbl$time <- round(ttbl$time, 2)
+names(ttbl) <- c("n", "Trees", "Time (s)")
+knitr::kable(ttbl, row.names = FALSE, align = "rrr",
+             caption = "Pipeline time across tree counts.")
+```
 
-
-Table: Pipeline time across tree counts.
-
-|     n| Trees| Time (s)|
-|-----:|-----:|--------:|
-|  1000|   200|     0.06|
-|  1000|   500|     0.11|
-|  1000|  1000|     0.20|
-|  1000|  2000|     0.43|
-|  5000|   200|     1.01|
-|  5000|   500|     1.50|
-|  5000|  1000|     2.88|
-|  5000|  2000|     6.84|
-| 25000|   200|    16.85|
-| 25000|   500|    40.67|
-| 25000|  1000|    80.47|
-| 25000|  2000|   159.89|
-
-
-
-![plot of chunk tree-plot](performance-tree-plot-1.png)
+```{r tree-plot, echo=FALSE, fig.height=3.5}
+n_cols <- c("1000" = "#56B4E9", "5000" = "#E69F00", "25000" = "#009E73")
+par(mar = c(4, 4.5, 2, 1))
+plot(NULL, xlim = range(tree_bench$trees), ylim = range(tree_bench$time),
+     xlab = "Trees (B)", ylab = "Time (s)", log = "xy",
+     main = "Scaling with number of trees")
+for (nn in n_test) {
+  sub <- tree_bench[tree_bench$n == nn, ]
+  lines(sub$trees, sub$time, type = "b", pch = 16,
+        col = n_cols[as.character(nn)], lwd = 2)
+}
+legend("topleft", legend = paste("n =", format(n_test, big.mark = ",")),
+       col = n_cols, pch = 16, lty = 1, lwd = 2, bty = "n")
+```
 
 The pipeline scales approximately linearly in both $n$ and $B$.
 
@@ -243,8 +264,7 @@ When the direct solver is used, the kernel is formed as a sparse matrix.
 For the CG solver, only the sparse indicator matrix $Z$ is stored.  The table
 below shows the actual memory usage compared to the theoretical dense kernel:
 
-
-``` r
+```{r memory, cache=TRUE}
 mem_data <- do.call(rbind, lapply(
   c(500, 1000, 2500, 5000, 10000, 25000, 50000),
   function(nn) {
@@ -283,23 +303,44 @@ mem_data <- do.call(rbind, lapply(
 ))
 ```
 
+```{r memory-table, echo=FALSE}
+mtbl <- mem_data
+mtbl$actual_MB <- ifelse(!is.na(mtbl$sparse_MB) & mtbl$solver == "direct",
+                         mtbl$sparse_MB, mtbl$Z_MB)
+mtbl$what <- ifelse(!is.na(mtbl$sparse_MB) & mtbl$solver == "direct",
+                    "K (sparse)", "Z (factor)")
+mtbl$ratio <- paste0(round(mtbl$actual_MB / mtbl$dense_MB * 100, 1), "%")
+mtbl$pct_nz <- ifelse(is.na(mtbl$pct_nz), "--", paste0(mtbl$pct_nz, "%"))
+disp <- mtbl[, c("n", "mns", "solver", "pct_nz", "what",
+                  "actual_MB", "dense_MB", "ratio")]
+names(disp) <- c("n", "mns", "Solver", "K % nonzero", "Stored",
+                  "Actual (MB)", "Dense K (MB)", "Actual / Dense")
+knitr::kable(disp, row.names = FALSE, align = "rrlllrrl",
+             caption = "Memory usage with adaptive leaf size (p = 10).")
+```
 
+```{r memory-plot, echo=FALSE, fig.height=4}
+par(mar = c(4, 4.5, 2, 1))
 
-Table: Memory usage with adaptive leaf size (p = 10).
+actual_mb <- ifelse(!is.na(mem_data$sparse_MB) & mem_data$solver == "direct",
+                    mem_data$sparse_MB, mem_data$Z_MB)
+pt_col <- ifelse(!is.na(mem_data$sparse_MB) & mem_data$solver == "direct",
+                 "#56B4E9", "#E69F00")
 
-|     n| mns|Solver |K % nonzero |Stored     | Actual (MB)| Dense K (MB)|Actual / Dense |
-|-----:|---:|:------|:-----------|:----------|-----------:|------------:|:--------------|
-|   500|  20|cg     |39.4%       |Z (factor) |         6.0|            2|300%           |
-|  1000|  20|direct |28.8%       |K (sparse) |         3.5|            8|43.8%          |
-|  2500|  22|direct |20.1%       |K (sparse) |        15.1|           50|30.2%          |
-|  5000|  35|direct |16%         |K (sparse) |        48.1|          200|24%            |
-| 10000|  60|direct |12.6%       |K (sparse) |       151.7|          800|19%            |
-| 25000| 135|cg     |--          |Z (factor) |       300.4|         5000|6%             |
-| 50000| 260|cg     |--          |Z (factor) |       600.3|        20000|3%             |
+plot(mem_data$n, mem_data$dense_MB, type = "b", pch = 4,
+     col = "firebrick", lwd = 2, lty = 2, log = "xy",
+     xlab = "n", ylab = "Memory (MB)",
+     ylim = c(min(actual_mb), max(mem_data$dense_MB)),
+     main = "Memory usage vs n (B = 1,000, adaptive leaf size)")
+lines(mem_data$n, actual_mb, type = "b", pch = 16, col = pt_col, lwd = 2)
 
-
-
-![plot of chunk memory-plot](performance-memory-plot-1.png)
+legend("topleft",
+       legend = c("Dense K (theoretical)",
+                  "K sparse (direct solver)",
+                  "Z factor (CG solver)"),
+       col = c("firebrick", "#56B4E9", "#E69F00"),
+       pch = c(4, 16, 16), lty = c(2, 1, 1), lwd = 2, bty = "n", cex = 0.8)
+```
 
 At $n = 50{,}000$, a dense kernel would require **19 GB**.  The CG solver
 stores only the $Z$ matrix, using a small fraction of this.

@@ -10,20 +10,19 @@ that persists even at large sample sizes.
 To see this, we compare the standard (no cross-fitting) estimator with
 small leaf size against the cross-fitted estimator with adaptive leaf
 size and an oracle that uses the true propensity scores. We use
-$`n = 10{,}000`$ and $`p = 50`$ covariates, where the bias is most
-pronounced:
+$`n = 10{,}000`$ and $`p = 50`$ covariates:
 
 ``` r
 library(forestBalance)
 
 set.seed(123)
-nreps <- 5
+nreps <- 2
 
 res <- matrix(NA, nreps, 3,
               dimnames = list(NULL, c("No CF (mns=10)", "CF (default)", "Oracle IPW")))
 
 for (r in seq_len(nreps)) {
-  dat <- simulate_data(n = 10000, p = 50, ate = 0)
+  dat <- simulate_data(n = 5000, p = 50, ate = 0)
 
   # Standard: no cross-fitting, small min.node.size
   fit_nocf <- forest_balance(dat$X, dat$A, dat$Y,
@@ -43,13 +42,13 @@ for (r in seq_len(nreps)) {
 }
 ```
 
-| Method         |    Bias |     SD |   RMSE |
-|:---------------|--------:|-------:|-------:|
-| No CF (mns=10) |  0.1737 | 0.0361 | 0.1774 |
-| CF (default)   |  0.0215 | 0.0383 | 0.0439 |
-| Oracle IPW     | -0.0058 | 0.1385 | 0.1387 |
+| Method         |   Bias |     SD |   RMSE |
+|:---------------|-------:|-------:|-------:|
+| No CF (mns=10) | 0.1912 | 0.0288 | 0.1934 |
+| CF (default)   | 0.0021 | 0.0314 | 0.0315 |
+| Oracle IPW     | 0.0228 | 0.0149 | 0.0272 |
 
-n = 10,000, p = 50, true ATE = 0, 5 replications.
+n = 5,000, p = 50, true ATE = 0, 2 replications.
 
 The no-cross-fitting estimator with small leaves has substantial bias.
 The default cross-fitted estimator with adaptive leaf size achieves much
@@ -125,9 +124,9 @@ curse of dimensionality). `forestBalance` uses an adaptive heuristic:
 
 ``` r
 set.seed(123)
-nreps <- 5
+nreps <- 2
 node_sizes <- c(5, 10, 20, 50, 75, 100)
-n <- 10000; p <- 50
+n <- 5000; p <- 50
 
 leaf_res <- do.call(rbind, lapply(node_sizes, function(mns) {
   ates <- replicate(nreps, {
@@ -142,17 +141,17 @@ leaf_res <- do.call(rbind, lapply(node_sizes, function(mns) {
 heuristic <- max(20, min(floor(n / 200) + p, floor(n / 50)))
 ```
 
-| min.node.size |   Bias |     SD |   RMSE |     |
-|--------------:|-------:|-------:|-------:|:----|
-|             5 | 0.1549 | 0.0489 | 0.1624 |     |
-|            10 | 0.0940 | 0.0180 | 0.0957 |     |
-|            20 | 0.0811 | 0.0144 | 0.0824 |     |
-|            50 | 0.0217 | 0.0156 | 0.0267 |     |
-|            75 | 0.0109 | 0.0270 | 0.0292 |     |
-|           100 | 0.0101 | 0.0294 | 0.0311 | \<– |
+| min.node.size |    Bias |     SD |   RMSE |     |
+|--------------:|--------:|-------:|-------:|:----|
+|             5 |  0.1716 | 0.0134 | 0.1721 |     |
+|            10 |  0.1017 | 0.0015 | 0.1017 |     |
+|            20 |  0.0153 | 0.0447 | 0.0472 |     |
+|            50 |  0.0481 | 0.0063 | 0.0485 |     |
+|            75 | -0.0099 | 0.0351 | 0.0364 | \<– |
+|           100 |  0.0332 | 0.0007 | 0.0332 |     |
 
-Cross-fitted estimator (n = 10,000, p = 50, 5 reps). Arrow marks the
-adaptive default (mns = 100).
+Cross-fitted estimator (n = 5,000, p = 50, 2 reps). Arrow marks the
+adaptive default (mns = 75).
 
 Bias decreases with larger leaves until variance begins to dominate. The
 adaptive default balances bias reduction against variance.
@@ -167,13 +166,13 @@ fit <- forest_balance(dat$X, dat$A, dat$Y)
 fit
 #> Forest Kernel Energy Balancing (cross-fitted)
 #> -------------------------------------------------- 
-#>   n = 2,000  (n_treated = 690, n_control = 1310)
+#>   n = 2,000  (n_treated = 745, n_control = 1255)
 #>   Trees: 1000
 #>   Cross-fitting: 2 folds
 #>   Solver: direct
-#>   ATE estimate: 0.0646
-#>   Fold ATEs: 0.0218, 0.1075
-#>   ESS: treated = 469/690 (68%)   control = 995/1310 (76%)
+#>   ATE estimate: -0.0315
+#>   Fold ATEs: -0.0808, 0.0177
+#>   ESS: treated = 529/745 (71%)   control = 878/1255 (70%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
 ```
@@ -185,11 +184,11 @@ fit_nocf <- forest_balance(dat$X, dat$A, dat$Y, cross.fitting = FALSE)
 fit_nocf
 #> Forest Kernel Energy Balancing
 #> -------------------------------------------------- 
-#>   n = 2,000  (n_treated = 690, n_control = 1310)
+#>   n = 2,000  (n_treated = 745, n_control = 1255)
 #>   Trees: 1000
 #>   Solver: direct
-#>   ATE estimate: 0.0664
-#>   ESS: treated = 399/690 (58%)   control = 909/1310 (69%)
+#>   ATE estimate: -0.0215
+#>   ESS: treated = 459/745 (62%)   control = 759/1255 (60%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
 ```
@@ -201,13 +200,13 @@ fit_custom <- forest_balance(dat$X, dat$A, dat$Y, min.node.size = 50)
 fit_custom
 #> Forest Kernel Energy Balancing (cross-fitted)
 #> -------------------------------------------------- 
-#>   n = 2,000  (n_treated = 690, n_control = 1310)
+#>   n = 2,000  (n_treated = 745, n_control = 1255)
 #>   Trees: 1000
 #>   Cross-fitting: 2 folds
 #>   Solver: direct
-#>   ATE estimate: 0.0274
-#>   Fold ATEs: -0.02, 0.0749
-#>   ESS: treated = 400/690 (58%)   control = 851/1310 (65%)
+#>   ATE estimate: -0.0784
+#>   Fold ATEs: -0.0918, -0.065
+#>   ESS: treated = 424/745 (57%)   control = 739/1255 (59%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
 ```
@@ -222,7 +221,7 @@ modest effect compared to the leaf size. Values of 2–5 all work well:
 
 ``` r
 set.seed(123)
-nreps <- 5
+nreps <- 2
 n <- 5000
 
 fold_res <- do.call(rbind, lapply(c(2, 3, 5, 10), function(nfolds) {
@@ -239,10 +238,10 @@ fold_res <- do.call(rbind, lapply(c(2, 3, 5, 10), function(nfolds) {
 
 | Folds |   Bias |     SD |   RMSE |
 |------:|-------:|-------:|-------:|
-|     2 | 0.0193 | 0.0405 | 0.0448 |
-|     3 | 0.0398 | 0.0357 | 0.0534 |
-|     5 | 0.0609 | 0.0446 | 0.0755 |
-|    10 | 0.2014 | 0.0456 | 0.2065 |
+|     2 | 0.0907 | 0.0456 | 0.1015 |
+|     3 | 0.0246 | 0.0275 | 0.0369 |
+|     5 | 0.1025 | 0.0096 | 0.1030 |
+|    10 | 0.2065 | 0.1269 | 0.2424 |
 
 Effect of number of folds (n = 5,000, adaptive leaf size).
 

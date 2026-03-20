@@ -23,6 +23,7 @@ forest_balance(
   scale.outcomes = TRUE,
   solver = c("auto", "direct", "cg"),
   tol = 5e-11,
+  parallel = FALSE,
   ...
 )
 ```
@@ -101,6 +102,16 @@ forest_balance(
 - tol:
 
   Convergence tolerance for the CG solver. Default is `5e-11`.
+
+- parallel:
+
+  Logical or integer. If `FALSE` (default), folds are processed
+  sequentially. If `TRUE`, folds are processed in parallel using all
+  available cores via
+  [`mclapply`](https://rdrr.io/r/parallel/mclapply.html). An integer
+  value specifies the exact number of cores. Only used when
+  `cross.fitting = TRUE`. Note: parallel processing is not supported on
+  Windows.
 
 - ...:
 

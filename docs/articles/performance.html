@@ -75,29 +75,36 @@ characterize how speed and memory scale with sample size
 (<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math>)
 and number of trees
 (<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>B</mi><annotation encoding="application/x-tex">B</annotation></semantics></math>).</p>
-<p><code>forestBalance</code> adaptively selects between two linear
-solvers based on the per-fold sample size and the kernel density (which
-depends on <code>min.node.size</code>):</p>
+<p>The pipeline has four stages, each optimized:</p>
+<ol style="list-style-type: decimal">
+<li>
+<strong>Forest fitting</strong>
+(<code><a href="https://rdrr.io/pkg/grf/man/multi_regression_forest.html" class="external-link">grf::multi_regression_forest</a></code>) – C++ via grf.</li>
+<li>
+<strong>Leaf node extraction</strong>
+(<code>get_leaf_node_matrix</code>) – C++ via Rcpp.</li>
+<li>
+<strong>Indicator matrix construction</strong>
+(<code>leaf_node_kernel_Z</code>) – C++ via Rcpp, building CSC sparse
+format directly without sorting.</li>
+<li>
+<strong>Weight computation</strong> (<code>kernel_balance</code>) –
+adaptive solver:
 <ul>
 <li>
-<strong>Direct</strong>: sparse Cholesky on the treated and control
-sub-blocks of the kernel matrix. Exact solution. Preferred for smaller
-problems.</li>
+<strong>Direct</strong>: sparse Cholesky on treated/control
+sub-blocks. Preferred for smaller problems.</li>
 <li>
-<strong>Conjugate gradient (CG)</strong>: iterative solver using the
-factored
+<strong>CG</strong>: conjugate gradient using the factored
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>Z</mi><annotation encoding="application/x-tex">Z</annotation></semantics></math>
-representation
-(<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>K</mi><mo>=</mo><mi>Z</mi><msup><mi>Z</mi><mi>⊤</mi></msup><mi>/</mi><mi>B</mi></mrow><annotation encoding="application/x-tex">K = Z Z^\top / B</annotation></semantics></math>),
-so the full kernel matrix is never formed. Preferred when
+representation. No kernel matrix is formed. Preferred for large
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math>
-is large or the adaptive <code>min.node.size</code> creates dense
-kernels (e.g., high
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>p</mi><annotation encoding="application/x-tex">p</annotation></semantics></math>).</li>
+or dense kernels.</li>
 </ul>
+</li>
+</ol>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/jaredhuling/forestBalance" class="external-link">forestBalance</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/grf-labs/grf" class="external-link">grf</a></span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/grf-labs/grf" class="external-link">grf</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://Matrix.R-forge.R-project.org" class="external-link">Matrix</a></span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
@@ -199,7 +206,10 @@ nonzero entries (one per tree), so
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>Z</mi><annotation encoding="application/x-tex">Z</annotation></semantics></math>
 has
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi><mi>B</mi></mrow><annotation encoding="application/x-tex">nB</annotation></semantics></math>
-nonzeros total.</p>
+nonzeros total. The
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>Z</mi><annotation encoding="application/x-tex">Z</annotation></semantics></math>
+matrix is constructed in C++ directly in compressed sparse column (CSC)
+format, avoiding the overhead of R’s triplet sorting.</p>
 </div>
 <div class="section level3">
 <h3 id="direct-solver-block-cholesky">Direct solver (block Cholesky)<a class="anchor" aria-label="anchor" href="#direct-solver-block-cholesky"></a>
@@ -252,11 +262,7 @@ for
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>Z</mi><annotation encoding="application/x-tex">Z</annotation></semantics></math>
 alone, versus
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>O</mi><mo stretchy="false" form="prefix">(</mo><msup><mi>n</mi><mn>2</mn></msup><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">O(n^2)</annotation></semantics></math>
-for the kernel. At
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi><mo>=</mo><mn>25</mn><mo>,</mo><mn>000</mn></mrow><annotation encoding="application/x-tex">n = 25{,}000</annotation></semantics></math>
-with
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>B</mi><mo>=</mo><mn>1</mn><mo>,</mo><mn>000</mn></mrow><annotation encoding="application/x-tex">B = 1{,}000</annotation></semantics></math>
-this is ~300 MB vs ~4.7 GB. Each CG iteration costs
+for the kernel. Each CG iteration costs
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>O</mi><mo stretchy="false" form="prefix">(</mo><msub><mi>n</mi><mi>g</mi></msub><mi>B</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">O(n_g B)</annotation></semantics></math>
 (where
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>n</mi><mi>g</mi></msub><annotation encoding="application/x-tex">n_g</annotation></semantics></math>
@@ -282,15 +288,17 @@ making it the preferred solver for large problems.</p>
 <h2 id="end-to-end-timing">End-to-end timing<a class="anchor" aria-label="anchor" href="#end-to-end-timing"></a>
 </h2>
 <p>We benchmark the full <code><a href="../reference/forest_balance.html">forest_balance()</a></code> pipeline (forest
-fitting, leaf extraction, kernel/Z construction, and weight computation)
-across a range of sample sizes with
+fitting, leaf extraction, Z construction, and weight computation) across
+a range of sample sizes up to
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi><mo>=</mo><mn>50</mn><mo>,</mo><mn>000</mn></mrow><annotation encoding="application/x-tex">n = 50{,}000</annotation></semantics></math>
+with
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>B</mi><mo>=</mo><mn>1</mn><mo>,</mo><mn>000</mn></mrow><annotation encoding="application/x-tex">B = 1{,}000</annotation></semantics></math>
 trees. To show the effect of solver choice, we run each
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math>
 with both <code>solver = "direct"</code> and <code>solver = "cg"</code>
 where feasible:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">n_vals</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">500</span>, <span class="fl">1000</span>, <span class="fl">2500</span>, <span class="fl">5000</span>, <span class="fl">10000</span>, <span class="fl">25000</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">n_vals</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">500</span>, <span class="fl">1000</span>, <span class="fl">2500</span>, <span class="fl">5000</span>, <span class="fl">10000</span>, <span class="fl">25000</span>, <span class="fl">50000</span><span class="op">)</span></span>
 <span><span class="va">B</span> <span class="op">&lt;-</span> <span class="fl">1000</span></span>
 <span><span class="va">p</span> <span class="op">&lt;-</span> <span class="fl">10</span></span>
 <span></span>
@@ -303,7 +311,7 @@ where feasible:</p>
 <span>    <span class="va">fit_auto</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/forest_balance.html">forest_balance</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">X</span>, <span class="va">dat</span><span class="op">$</span><span class="va">A</span>, <span class="va">dat</span><span class="op">$</span><span class="va">Y</span>, num.trees <span class="op">=</span> <span class="va">B</span><span class="op">)</span></span>
 <span>  <span class="op">)</span><span class="op">[</span><span class="st">"elapsed"</span><span class="op">]</span></span>
 <span></span>
-<span>  <span class="co"># Direct (skip for n &gt; 10000 — too slow)</span></span>
+<span>  <span class="co"># Direct (skip for n &gt; 10000)</span></span>
 <span>  <span class="kw">if</span> <span class="op">(</span><span class="va">nn</span> <span class="op">&lt;=</span> <span class="fl">10000</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="va">t_dir</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span></span>
 <span>      <span class="va">fit_dir</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/forest_balance.html">forest_balance</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">X</span>, <span class="va">dat</span><span class="op">$</span><span class="va">A</span>, <span class="va">dat</span><span class="op">$</span><span class="va">Y</span>, num.trees <span class="op">=</span> <span class="va">B</span>,</span>
@@ -336,48 +344,57 @@ where feasible:</p>
 <tr class="odd">
 <td align="right">500</td>
 <td align="right">1000</td>
-<td align="right">0.09</td>
-<td align="left">0.29</td>
+<td align="right">0.08</td>
+<td align="left">0.22</td>
 <td align="left">cg</td>
 </tr>
 <tr class="even">
 <td align="right">1000</td>
 <td align="right">1000</td>
-<td align="right">0.21</td>
-<td align="left">0.56</td>
+<td align="right">0.18</td>
+<td align="left">0.57</td>
 <td align="left">direct</td>
 </tr>
 <tr class="odd">
 <td align="right">2500</td>
 <td align="right">1000</td>
-<td align="right">0.89</td>
-<td align="left">1.64</td>
+<td align="right">0.71</td>
+<td align="left">1.49</td>
 <td align="left">direct</td>
 </tr>
 <tr class="even">
 <td align="right">5000</td>
 <td align="right">1000</td>
-<td align="right">2.87</td>
-<td align="left">4.51</td>
+<td align="right">2.72</td>
+<td align="left">4.36</td>
 <td align="left">direct</td>
 </tr>
 <tr class="odd">
 <td align="right">10000</td>
 <td align="right">1000</td>
-<td align="right">10.90</td>
-<td align="left">16.56</td>
+<td align="right">13.54</td>
+<td align="left">15.53</td>
 <td align="left">direct</td>
 </tr>
 <tr class="even">
 <td align="right">25000</td>
 <td align="right">1000</td>
 <td align="right">–</td>
-<td align="left">77.29</td>
+<td align="left">80.05</td>
+<td align="left">cg</td>
+</tr>
+<tr class="odd">
+<td align="right">50000</td>
+<td align="right">1000</td>
+<td align="right">–</td>
+<td align="left">187.86</td>
 <td align="left">cg</td>
 </tr>
 </tbody>
 </table>
-<p><img src="performance_files/figure-html/timing-plot-1.png" class="r-plt" width="624"></p>
+<div class="float">
+<img src="performance-timing-plot-1.png" alt="plot of chunk timing-plot"><div class="figcaption">plot of chunk timing-plot</div>
+</div>
 <p>The circled points show which solver <code>"auto"</code> selects at
 each
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math>.
@@ -390,7 +407,7 @@ The switchover depends on both the per-fold sample size and the adaptive
 </h2>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tree_vals</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">200</span>, <span class="fl">500</span>, <span class="fl">1000</span>, <span class="fl">2000</span><span class="op">)</span></span>
-<span><span class="va">n_test</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1000</span>, <span class="fl">5000</span><span class="op">)</span></span>
+<span><span class="va">n_test</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1000</span>, <span class="fl">5000</span>, <span class="fl">25000</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">tree_bench</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">n_test</span>, <span class="kw">function</span><span class="op">(</span><span class="va">nn</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">tree_vals</span>, <span class="kw">function</span><span class="op">(</span><span class="va">B</span><span class="op">)</span> <span class="op">{</span></span>
@@ -428,63 +445,73 @@ The switchover depends on both the per-fold sample size and the adaptive
 <tr class="even">
 <td align="right">1000</td>
 <td align="right">2000</td>
-<td align="right">0.38</td>
+<td align="right">0.43</td>
 </tr>
 <tr class="odd">
 <td align="right">5000</td>
 <td align="right">200</td>
-<td align="right">0.93</td>
+<td align="right">1.01</td>
 </tr>
 <tr class="even">
 <td align="right">5000</td>
 <td align="right">500</td>
-<td align="right">1.37</td>
+<td align="right">1.50</td>
 </tr>
 <tr class="odd">
 <td align="right">5000</td>
 <td align="right">1000</td>
-<td align="right">2.19</td>
+<td align="right">2.88</td>
 </tr>
 <tr class="even">
 <td align="right">5000</td>
 <td align="right">2000</td>
-<td align="right">4.30</td>
+<td align="right">6.84</td>
+</tr>
+<tr class="odd">
+<td align="right">25000</td>
+<td align="right">200</td>
+<td align="right">16.85</td>
+</tr>
+<tr class="even">
+<td align="right">25000</td>
+<td align="right">500</td>
+<td align="right">40.67</td>
+</tr>
+<tr class="odd">
+<td align="right">25000</td>
+<td align="right">1000</td>
+<td align="right">80.47</td>
+</tr>
+<tr class="even">
+<td align="right">25000</td>
+<td align="right">2000</td>
+<td align="right">159.89</td>
 </tr>
 </tbody>
 </table>
-<p><img src="performance_files/figure-html/tree-plot-1.png" class="r-plt" width="624"></p>
+<div class="float">
+<img src="performance-tree-plot-1.png" alt="plot of chunk tree-plot"><div class="figcaption">plot of chunk tree-plot</div>
+</div>
 <p>The pipeline scales approximately linearly in both
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math>
 and
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>B</mi><annotation encoding="application/x-tex">B</annotation></semantics></math>.</p>
 </div>
 <div class="section level2">
-<h2 id="kernel-sparsity-and-memory">Kernel sparsity and memory<a class="anchor" aria-label="anchor" href="#kernel-sparsity-and-memory"></a>
+<h2 id="memory-usage">Memory usage<a class="anchor" aria-label="anchor" href="#memory-usage"></a>
 </h2>
-<p>When the direct solver is used
-(<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi><mo>≤</mo><mn>5</mn><mo>,</mo><mn>000</mn></mrow><annotation encoding="application/x-tex">n \le 5{,}000</annotation></semantics></math>),
-the kernel is formed as a sparse matrix. The kernel becomes sparser as
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math>
-grows, because fewer pairs of observations share a leaf in any given
-tree.</p>
-<p>For
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi><mo>&gt;</mo><mn>5</mn><mo>,</mo><mn>000</mn></mrow><annotation encoding="application/x-tex">n &gt; 5{,}000</annotation></semantics></math>,
-the CG solver avoids forming the kernel entirely; memory usage is then
-dominated by the sparse indicator matrix
+<p>When the direct solver is used, the kernel is formed as a sparse
+matrix. For the CG solver, only the sparse indicator matrix
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>Z</mi><annotation encoding="application/x-tex">Z</annotation></semantics></math>
-(<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi><mo>×</mo><mi>L</mi></mrow><annotation encoding="application/x-tex">n \times L</annotation></semantics></math>
-with
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi><mi>B</mi></mrow><annotation encoding="application/x-tex">nB</annotation></semantics></math>
-nonzeros). The table and plot below show the actual memory usage for
-both regimes:</p>
+is stored. The table below shows the actual memory usage compared to the
+theoretical dense kernel:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">mem_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">500</span>, <span class="fl">1000</span>, <span class="fl">2500</span>, <span class="fl">5000</span>, <span class="fl">10000</span>, <span class="fl">25000</span><span class="op">)</span>,</span>
+<code class="sourceCode R"><span><span class="va">mem_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">500</span>, <span class="fl">1000</span>, <span class="fl">2500</span>, <span class="fl">5000</span>, <span class="fl">10000</span>, <span class="fl">25000</span>, <span class="fl">50000</span><span class="op">)</span>,</span>
 <span>  <span class="kw">function</span><span class="op">(</span><span class="va">nn</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span>
 <span>    <span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/simulate_data.html">simulate_data</a></span><span class="op">(</span>n <span class="op">=</span> <span class="va">nn</span>, p <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span>
 <span>    <span class="va">B_val</span> <span class="op">&lt;-</span> <span class="fl">1000</span></span>
-<span></span>
-<span>    <span class="co"># Use adaptive min.node.size (same as forest_balance default)</span></span>
 <span>    <span class="va">mns</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fl">20L</span>, <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">min</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">floor</a></span><span class="op">(</span><span class="va">nn</span> <span class="op">/</span> <span class="fl">200</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">ncol</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">X</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">floor</a></span><span class="op">(</span><span class="va">nn</span> <span class="op">/</span> <span class="fl">50</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span>    <span class="va">fit_forest</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/grf/man/multi_regression_forest.html" class="external-link">multi_regression_forest</a></span><span class="op">(</span></span>
@@ -493,21 +520,21 @@ both regimes:</p>
 <span>    <span class="op">)</span></span>
 <span>    <span class="va">leaf_mat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/get_leaf_node_matrix.html">get_leaf_node_matrix</a></span><span class="op">(</span><span class="va">fit_forest</span>, <span class="va">dat</span><span class="op">$</span><span class="va">X</span><span class="op">)</span></span>
 <span></span>
-<span>    <span class="co"># Z matrix (always computed)</span></span>
 <span>    <span class="va">Z</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/leaf_node_kernel_Z.html">leaf_node_kernel_Z</a></span><span class="op">(</span><span class="va">leaf_mat</span><span class="op">)</span></span>
 <span>    <span class="va">z_mb</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/utils/object.size.html" class="external-link">object.size</a></span><span class="op">(</span><span class="va">Z</span><span class="op">)</span><span class="op">)</span> <span class="op">/</span> <span class="fl">1e6</span></span>
 <span></span>
-<span>    <span class="co"># Kernel</span></span>
-<span>    <span class="va">K</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/leaf_node_kernel.html">leaf_node_kernel</a></span><span class="op">(</span><span class="va">leaf_mat</span><span class="op">)</span></span>
-<span>    <span class="va">nnz</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">K</span><span class="op">@</span><span class="va">x</span><span class="op">)</span></span>
-<span>    <span class="va">pct_nz</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fl">100</span> <span class="op">*</span> <span class="va">nnz</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">nn</span><span class="op">)</span><span class="op">^</span><span class="fl">2</span>, <span class="fl">1</span><span class="op">)</span></span>
-<span>    <span class="va">k_mb</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/utils/object.size.html" class="external-link">object.size</a></span><span class="op">(</span><span class="va">K</span><span class="op">)</span><span class="op">)</span> <span class="op">/</span> <span class="fl">1e6</span>, <span class="fl">1</span><span class="op">)</span></span>
+<span>    <span class="co"># Kernel sparsity (skip forming K for very large n)</span></span>
+<span>    <span class="kw">if</span> <span class="op">(</span><span class="va">nn</span> <span class="op">&lt;=</span> <span class="fl">10000</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="va">K</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/leaf_node_kernel.html">leaf_node_kernel</a></span><span class="op">(</span><span class="va">leaf_mat</span><span class="op">)</span></span>
+<span>      <span class="va">pct_nz</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fl">100</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">K</span><span class="op">@</span><span class="va">x</span><span class="op">)</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">nn</span><span class="op">)</span><span class="op">^</span><span class="fl">2</span>, <span class="fl">1</span><span class="op">)</span></span>
+<span>      <span class="va">k_mb</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/utils/object.size.html" class="external-link">object.size</a></span><span class="op">(</span><span class="va">K</span><span class="op">)</span><span class="op">)</span> <span class="op">/</span> <span class="fl">1e6</span>, <span class="fl">1</span><span class="op">)</span></span>
+<span>    <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
+<span>      <span class="va">pct_nz</span> <span class="op">&lt;-</span> <span class="cn">NA</span></span>
+<span>      <span class="va">k_mb</span> <span class="op">&lt;-</span> <span class="cn">NA</span></span>
+<span>    <span class="op">}</span></span>
 <span></span>
-<span>    <span class="co"># Which solver would auto pick?</span></span>
-<span>    <span class="co"># (approximate: uses per-fold size n/2 for CF K=2)</span></span>
 <span>    <span class="va">n_fold</span> <span class="op">&lt;-</span> <span class="va">nn</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%/%</a></span> <span class="fl">2</span></span>
 <span>    <span class="va">auto_solver</span> <span class="op">&lt;-</span> <span class="kw">if</span> <span class="op">(</span><span class="va">n_fold</span> <span class="op">&gt;</span> <span class="fl">5000</span> <span class="op">||</span> <span class="va">mns</span> <span class="op">&gt;</span> <span class="va">n_fold</span> <span class="op">/</span> <span class="fl">20</span><span class="op">)</span> <span class="st">"cg"</span> <span class="kw">else</span> <span class="st">"direct"</span></span>
-<span></span>
 <span>    <span class="va">dense_mb</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fl">8</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">nn</span><span class="op">)</span><span class="op">^</span><span class="fl">2</span> <span class="op">/</span> <span class="fl">1e6</span>, <span class="fl">0</span><span class="op">)</span></span>
 <span></span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>n <span class="op">=</span> <span class="va">nn</span>, mns <span class="op">=</span> <span class="va">mns</span>, pct_nz <span class="op">=</span> <span class="va">pct_nz</span>,</span>
@@ -542,7 +569,7 @@ both regimes:</p>
 <td align="right">500</td>
 <td align="right">20</td>
 <td align="left">cg</td>
-<td align="left">38%</td>
+<td align="left">39.4%</td>
 <td align="left">Z (factor)</td>
 <td align="right">6.0</td>
 <td align="right">2</td>
@@ -552,17 +579,17 @@ both regimes:</p>
 <td align="right">1000</td>
 <td align="right">20</td>
 <td align="left">direct</td>
-<td align="left">29.9%</td>
+<td align="left">28.8%</td>
 <td align="left">K (sparse)</td>
-<td align="right">3.6</td>
+<td align="right">3.5</td>
 <td align="right">8</td>
-<td align="left">45%</td>
+<td align="left">43.8%</td>
 </tr>
 <tr class="odd">
 <td align="right">2500</td>
 <td align="right">22</td>
 <td align="left">direct</td>
-<td align="left">20.2%</td>
+<td align="left">20.1%</td>
 <td align="left">K (sparse)</td>
 <td align="right">15.1</td>
 <td align="right">50</td>
@@ -572,50 +599,66 @@ both regimes:</p>
 <td align="right">5000</td>
 <td align="right">35</td>
 <td align="left">direct</td>
-<td align="left">15.4%</td>
+<td align="left">16%</td>
 <td align="left">K (sparse)</td>
-<td align="right">46.3</td>
+<td align="right">48.1</td>
 <td align="right">200</td>
-<td align="left">23.1%</td>
+<td align="left">24%</td>
 </tr>
 <tr class="odd">
 <td align="right">10000</td>
 <td align="right">60</td>
 <td align="left">direct</td>
-<td align="left">11.9%</td>
+<td align="left">12.6%</td>
 <td align="left">K (sparse)</td>
-<td align="right">143.0</td>
+<td align="right">151.7</td>
 <td align="right">800</td>
-<td align="left">17.9%</td>
+<td align="left">19%</td>
 </tr>
 <tr class="even">
 <td align="right">25000</td>
 <td align="right">135</td>
 <td align="left">cg</td>
-<td align="left">8.4%</td>
+<td align="left">–</td>
 <td align="left">Z (factor)</td>
 <td align="right">300.4</td>
 <td align="right">5000</td>
 <td align="left">6%</td>
 </tr>
+<tr class="odd">
+<td align="right">50000</td>
+<td align="right">260</td>
+<td align="left">cg</td>
+<td align="left">–</td>
+<td align="left">Z (factor)</td>
+<td align="right">600.3</td>
+<td align="right">20000</td>
+<td align="left">3%</td>
+</tr>
 </tbody>
 </table>
-<p><img src="performance_files/figure-html/memory-plot-1.png" class="r-plt" width="624"></p>
+<div class="float">
+<img src="performance-memory-plot-1.png" alt="plot of chunk memory-plot"><div class="figcaption">plot of chunk memory-plot</div>
+</div>
 <p>At
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi><mo>=</mo><mn>25</mn><mo>,</mo><mn>000</mn></mrow><annotation encoding="application/x-tex">n = 25{,}000</annotation></semantics></math>,
-a dense kernel would require <strong>4.7 GB</strong>. The CG solver
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi><mo>=</mo><mn>50</mn><mo>,</mo><mn>000</mn></mrow><annotation encoding="application/x-tex">n = 50{,}000</annotation></semantics></math>,
+a dense kernel would require <strong>19 GB</strong>. The CG solver
 stores only the
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>Z</mi><annotation encoding="application/x-tex">Z</annotation></semantics></math>
-matrix (<strong>~300 MB</strong>), a <strong>16-fold</strong>
-reduction.</p>
+matrix, using a small fraction of this.</p>
 </div>
 <div class="section level2">
 <h2 id="summary">Summary<a class="anchor" aria-label="anchor" href="#summary"></a>
 </h2>
 <ul>
 <li>The full <code><a href="../reference/forest_balance.html">forest_balance()</a></code> pipeline scales to
-<strong><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi><mo>=</mo><mn>25</mn><mo>,</mo><mn>000</mn></mrow><annotation encoding="application/x-tex">n = 25{,}000</annotation></semantics></math></strong>
-in under a minute with 1,000 trees.</li>
+<strong><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi><mo>=</mo><mn>50</mn><mo>,</mo><mn>000</mn></mrow><annotation encoding="application/x-tex">n = 50{,}000</annotation></semantics></math></strong>
+with 1,000 trees.</li>
+<li>All computationally intensive steps are in compiled code: C++ for
+leaf extraction and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>Z</mi><annotation encoding="application/x-tex">Z</annotation></semantics></math>
+construction (Rcpp), BLAS for sparse matrix operations, and CHOLMOD for
+sparse Cholesky.</li>
 <li>The adaptive <code>min.node.size</code> heuristic adjusts leaf size
 to both
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math>

@@ -21,8 +21,8 @@ library(Matrix)
 multivariate random forests with kernel energy balancing. A joint forest model
 of covariates, treatment, and outcome defines a proximity kernel that characterizes
 the confounding structure and emphasizes similarity of observations in terms of confounding. 
-Distributional balancing weights are then obtained via a closed-form
-kernel energy distance solution. By construction, these balancing weights aim to balance the joint
+The kernel is then used in kernel energy balancing, which minimizes the distributional distance between treatment and control groups. By using the joint forest kernel, this balancing approach emphasizes balance of variables that impact both treatment and outcome. 
+By construction, these balancing weights aim to balance the joint
 distribution of confounders specifically.
 
 The method is described in:

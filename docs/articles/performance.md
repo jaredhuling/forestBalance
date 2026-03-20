@@ -6,19 +6,22 @@ This vignette benchmarks the `forestBalance` pipeline to characterize
 how speed and memory scale with sample size ($`n`$) and number of trees
 ($`B`$).
 
-`forestBalance` adaptively selects between two linear solvers based on
-the per-fold sample size and the kernel density (which depends on
-`min.node.size`):
+The pipeline has four stages, each optimized:
 
-- **Direct**: sparse Cholesky on the treated and control sub-blocks of
-  the kernel matrix. Exact solution. Preferred for smaller problems.
-- **Conjugate gradient (CG)**: iterative solver using the factored $`Z`$
-  representation ($`K = Z Z^\top / B`$), so the full kernel matrix is
-  never formed. Preferred when $`n`$ is large or the adaptive
-  `min.node.size` creates dense kernels (e.g., high $`p`$).
+1.  **Forest fitting**
+    ([`grf::multi_regression_forest`](https://rdrr.io/pkg/grf/man/multi_regression_forest.html))
+    – C++ via grf.
+2.  **Leaf node extraction** (`get_leaf_node_matrix`) – C++ via Rcpp.
+3.  **Indicator matrix construction** (`leaf_node_kernel_Z`) – C++ via
+    Rcpp, building CSC sparse format directly without sorting.
+4.  **Weight computation** (`kernel_balance`) – adaptive solver:
+    - **Direct**: sparse Cholesky on treated/control sub-blocks.
+      Preferred for smaller problems.
+    - **CG**: conjugate gradient using the factored $`Z`$
+      representation. No kernel matrix is formed. Preferred for large
+      $`n`$ or dense kernels.
 
 ``` r
-library(forestBalance)
 library(grf)
 library(Matrix)
 ```
@@ -76,7 +79,9 @@ Lagrange multiplier).
 The proximity kernel is $`K = Z Z^\top / B`$, where $`Z`$ is a sparse
 $`n \times L`$ indicator matrix ($`L = \sum_{b=1}^B L_b`$, total leaves
 across all trees). Each row of $`Z`$ has exactly $`B`$ nonzero entries
-(one per tree), so $`Z`$ has $`nB`$ nonzeros total.
+(one per tree), so $`Z`$ has $`nB`$ nonzeros total. The $`Z`$ matrix is
+constructed in C++ directly in compressed sparse column (CSC) format,
+avoiding the overhead of R’s triplet sorting.
 
 ### Direct solver (block Cholesky)
 
@@ -108,8 +113,7 @@ each costing $`O(n_1 B)`$ via two sparse matrix–vector multiplies. The
 same applies to the control block with $`Z_c`$.
 
 Here, the memory use is $`O(nB)`$ for $`Z`$ alone, versus $`O(n^2)`$ for
-the kernel. At $`n = 25{,}000`$ with $`B = 1{,}000`$ this is ~300 MB vs
-~4.7 GB. Each CG iteration costs $`O(n_g B)`$ (where $`n_g`$ is the
+the kernel. Each CG iteration costs $`O(n_g B)`$ (where $`n_g`$ is the
 group size). Convergence typically requires 100–200 iterations,
 independent of $`n`$, so the total cost is
 $`O(n_g B \cdot T_{\text{iter}})`$. The six required solves (three per
@@ -125,13 +129,13 @@ both $`n`$ and $`B`$, making it the preferred solver for large problems.
 
 We benchmark the full
 [`forest_balance()`](https://jaredhuling.github.io/forestBalance/reference/forest_balance.md)
-pipeline (forest fitting, leaf extraction, kernel/Z construction, and
-weight computation) across a range of sample sizes with $`B = 1{,}000`$
-trees. To show the effect of solver choice, we run each $`n`$ with both
-`solver = "direct"` and `solver = "cg"` where feasible:
+pipeline (forest fitting, leaf extraction, Z construction, and weight
+computation) across a range of sample sizes up to $`n = 50{,}000`$ with
+$`B = 1{,}000`$ trees. To show the effect of solver choice, we run each
+$`n`$ with both `solver = "direct"` and `solver = "cg"` where feasible:
 
 ``` r
-n_vals <- c(500, 1000, 2500, 5000, 10000, 25000)
+n_vals <- c(500, 1000, 2500, 5000, 10000, 25000, 50000)
 B <- 1000
 p <- 10
 
@@ -144,7 +148,7 @@ bench <- do.call(rbind, lapply(n_vals, function(nn) {
     fit_auto <- forest_balance(dat$X, dat$A, dat$Y, num.trees = B)
   )["elapsed"]
 
-  # Direct (skip for n > 10000 — too slow)
+  # Direct (skip for n > 10000)
   if (nn <= 10000) {
     t_dir <- system.time(
       fit_dir <- forest_balance(dat$X, dat$A, dat$Y, num.trees = B,
@@ -168,16 +172,19 @@ bench <- do.call(rbind, lapply(n_vals, function(nn) {
 
 |     n | Trees | Direct (s) | CG (s) | Auto picks |
 |------:|------:|-----------:|:-------|:-----------|
-|   500 |  1000 |       0.09 | 0.29   | cg         |
-|  1000 |  1000 |       0.21 | 0.56   | direct     |
-|  2500 |  1000 |       0.89 | 1.64   | direct     |
-|  5000 |  1000 |       2.87 | 4.51   | direct     |
-| 10000 |  1000 |      10.90 | 16.56  | direct     |
-| 25000 |  1000 |          – | 77.29  | cg         |
+|   500 |  1000 |       0.08 | 0.22   | cg         |
+|  1000 |  1000 |       0.18 | 0.57   | direct     |
+|  2500 |  1000 |       0.71 | 1.49   | direct     |
+|  5000 |  1000 |       2.72 | 4.36   | direct     |
+| 10000 |  1000 |      13.54 | 15.53  | direct     |
+| 25000 |  1000 |          – | 80.05  | cg         |
+| 50000 |  1000 |          – | 187.86 | cg         |
 
 Full pipeline time by solver.
 
-![](performance_files/figure-html/timing-plot-1.png)
+![plot of chunk timing-plot](performance-timing-plot-1.png)
+
+plot of chunk timing-plot
 
 The circled points show which solver `"auto"` selects at each $`n`$. The
 switchover depends on both the per-fold sample size and the adaptive
@@ -187,7 +194,7 @@ switchover depends on both the per-fold sample size and the adaptive
 
 ``` r
 tree_vals <- c(200, 500, 1000, 2000)
-n_test <- c(1000, 5000)
+n_test <- c(1000, 5000, 25000)
 
 tree_bench <- do.call(rbind, lapply(n_test, function(nn) {
   do.call(rbind, lapply(tree_vals, function(B) {
@@ -201,42 +208,43 @@ tree_bench <- do.call(rbind, lapply(n_test, function(nn) {
 }))
 ```
 
-|    n | Trees | Time (s) |
-|-----:|------:|---------:|
-| 1000 |   200 |     0.06 |
-| 1000 |   500 |     0.11 |
-| 1000 |  1000 |     0.20 |
-| 1000 |  2000 |     0.38 |
-| 5000 |   200 |     0.93 |
-| 5000 |   500 |     1.37 |
-| 5000 |  1000 |     2.19 |
-| 5000 |  2000 |     4.30 |
+|     n | Trees | Time (s) |
+|------:|------:|---------:|
+|  1000 |   200 |     0.06 |
+|  1000 |   500 |     0.11 |
+|  1000 |  1000 |     0.20 |
+|  1000 |  2000 |     0.43 |
+|  5000 |   200 |     1.01 |
+|  5000 |   500 |     1.50 |
+|  5000 |  1000 |     2.88 |
+|  5000 |  2000 |     6.84 |
+| 25000 |   200 |    16.85 |
+| 25000 |   500 |    40.67 |
+| 25000 |  1000 |    80.47 |
+| 25000 |  2000 |   159.89 |
 
 Pipeline time across tree counts.
 
-![](performance_files/figure-html/tree-plot-1.png)
+![plot of chunk tree-plot](performance-tree-plot-1.png)
+
+plot of chunk tree-plot
 
 The pipeline scales approximately linearly in both $`n`$ and $`B`$.
 
-## Kernel sparsity and memory
+## Memory usage
 
-When the direct solver is used ($`n \le 5{,}000`$), the kernel is formed
-as a sparse matrix. The kernel becomes sparser as $`n`$ grows, because
-fewer pairs of observations share a leaf in any given tree.
-
-For $`n > 5{,}000`$, the CG solver avoids forming the kernel entirely;
-memory usage is then dominated by the sparse indicator matrix $`Z`$
-($`n \times L`$ with $`nB`$ nonzeros). The table and plot below show the
-actual memory usage for both regimes:
+When the direct solver is used, the kernel is formed as a sparse matrix.
+For the CG solver, only the sparse indicator matrix $`Z`$ is stored. The
+table below shows the actual memory usage compared to the theoretical
+dense kernel:
 
 ``` r
-mem_data <- do.call(rbind, lapply(c(500, 1000, 2500, 5000, 10000, 25000),
+mem_data <- do.call(rbind, lapply(
+  c(500, 1000, 2500, 5000, 10000, 25000, 50000),
   function(nn) {
     set.seed(123)
     dat <- simulate_data(n = nn, p = 10)
     B_val <- 1000
-
-    # Use adaptive min.node.size (same as forest_balance default)
     mns <- max(20L, min(floor(nn / 200) + ncol(dat$X), floor(nn / 50)))
 
     fit_forest <- multi_regression_forest(
@@ -245,21 +253,21 @@ mem_data <- do.call(rbind, lapply(c(500, 1000, 2500, 5000, 10000, 25000),
     )
     leaf_mat <- get_leaf_node_matrix(fit_forest, dat$X)
 
-    # Z matrix (always computed)
     Z <- leaf_node_kernel_Z(leaf_mat)
     z_mb <- as.numeric(object.size(Z)) / 1e6
 
-    # Kernel
-    K <- leaf_node_kernel(leaf_mat)
-    nnz <- length(K@x)
-    pct_nz <- round(100 * nnz / as.numeric(nn)^2, 1)
-    k_mb <- round(as.numeric(object.size(K)) / 1e6, 1)
+    # Kernel sparsity (skip forming K for very large n)
+    if (nn <= 10000) {
+      K <- leaf_node_kernel(leaf_mat)
+      pct_nz <- round(100 * length(K@x) / as.numeric(nn)^2, 1)
+      k_mb <- round(as.numeric(object.size(K)) / 1e6, 1)
+    } else {
+      pct_nz <- NA
+      k_mb <- NA
+    }
 
-    # Which solver would auto pick?
-    # (approximate: uses per-fold size n/2 for CF K=2)
     n_fold <- nn %/% 2
     auto_solver <- if (n_fold > 5000 || mns > n_fold / 20) "cg" else "direct"
-
     dense_mb <- round(8 * as.numeric(nn)^2 / 1e6, 0)
 
     data.frame(n = nn, mns = mns, pct_nz = pct_nz,
@@ -271,27 +279,31 @@ mem_data <- do.call(rbind, lapply(c(500, 1000, 2500, 5000, 10000, 25000),
 
 |     n | mns | Solver | K % nonzero | Stored     | Actual (MB) | Dense K (MB) | Actual / Dense |
 |------:|----:|:-------|:------------|:-----------|------------:|-------------:|:---------------|
-|   500 |  20 | cg     | 38%         | Z (factor) |         6.0 |            2 | 300%           |
-|  1000 |  20 | direct | 29.9%       | K (sparse) |         3.6 |            8 | 45%            |
-|  2500 |  22 | direct | 20.2%       | K (sparse) |        15.1 |           50 | 30.2%          |
-|  5000 |  35 | direct | 15.4%       | K (sparse) |        46.3 |          200 | 23.1%          |
-| 10000 |  60 | direct | 11.9%       | K (sparse) |       143.0 |          800 | 17.9%          |
-| 25000 | 135 | cg     | 8.4%        | Z (factor) |       300.4 |         5000 | 6%             |
+|   500 |  20 | cg     | 39.4%       | Z (factor) |         6.0 |            2 | 300%           |
+|  1000 |  20 | direct | 28.8%       | K (sparse) |         3.5 |            8 | 43.8%          |
+|  2500 |  22 | direct | 20.1%       | K (sparse) |        15.1 |           50 | 30.2%          |
+|  5000 |  35 | direct | 16%         | K (sparse) |        48.1 |          200 | 24%            |
+| 10000 |  60 | direct | 12.6%       | K (sparse) |       151.7 |          800 | 19%            |
+| 25000 | 135 | cg     | –           | Z (factor) |       300.4 |         5000 | 6%             |
+| 50000 | 260 | cg     | –           | Z (factor) |       600.3 |        20000 | 3%             |
 
 Memory usage with adaptive leaf size (p = 10).
 
-![](performance_files/figure-html/memory-plot-1.png)
+![plot of chunk memory-plot](performance-memory-plot-1.png)
 
-At $`n = 25{,}000`$, a dense kernel would require **4.7 GB**. The CG
-solver stores only the $`Z`$ matrix (**~300 MB**), a **16-fold**
-reduction.
+plot of chunk memory-plot
+
+At $`n = 50{,}000`$, a dense kernel would require **19 GB**. The CG
+solver stores only the $`Z`$ matrix, using a small fraction of this.
 
 ## Summary
 
 - The full
   [`forest_balance()`](https://jaredhuling.github.io/forestBalance/reference/forest_balance.md)
-  pipeline scales to **$`n = 25{,}000`$** in under a minute with 1,000
-  trees.
+  pipeline scales to **$`n = 50{,}000`$** with 1,000 trees.
+- All computationally intensive steps are in compiled code: C++ for leaf
+  extraction and $`Z`$ construction (Rcpp), BLAS for sparse matrix
+  operations, and CHOLMOD for sparse Cholesky.
 - The adaptive `min.node.size` heuristic adjusts leaf size to both $`n`$
   and $`p`$, creating denser kernels than the old default of 10.
 - The solver switchover between direct and CG depends on both the

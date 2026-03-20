@@ -25,19 +25,19 @@ sample sizes.
 To see this, we compare the standard (no cross-fitting) estimator with small
 leaf size against the cross-fitted estimator with adaptive leaf size and an
 oracle that uses the true propensity scores.  We use $n = 10{,}000$ and
-$p = 50$ covariates, where the bias is most pronounced:
+$p = 50$ covariates:
 
 ```{r overfitting-demo, cache=TRUE}
 library(forestBalance)
 
 set.seed(123)
-nreps <- 5
+nreps <- 2
 
 res <- matrix(NA, nreps, 3,
               dimnames = list(NULL, c("No CF (mns=10)", "CF (default)", "Oracle IPW")))
 
 for (r in seq_len(nreps)) {
-  dat <- simulate_data(n = 10000, p = 50, ate = 0)
+  dat <- simulate_data(n = 5000, p = 50, ate = 0)
 
   # Standard: no cross-fitting, small min.node.size
   fit_nocf <- forest_balance(dat$X, dat$A, dat$Y,
@@ -65,7 +65,7 @@ stbl <- data.frame(
   RMSE = round(sqrt(colMeans(res)^2 + apply(res, 2, var)), 4)
 )
 knitr::kable(stbl, row.names = FALSE,
-             caption = "n = 10,000, p = 50, true ATE = 0, 5 replications.")
+             caption = "n = 5,000, p = 50, true ATE = 0, 2 replications.")
 ```
 
 The no-cross-fitting estimator with small leaves has substantial bias.  The
@@ -138,9 +138,9 @@ $$\mathrm{min.node.size} = \max\!\Big(20,\;\min\!\big(\lfloor n/200 \rfloor + p,
 
 ```{r leaf-size, cache=TRUE}
 set.seed(123)
-nreps <- 5
+nreps <- 2
 node_sizes <- c(5, 10, 20, 50, 75, 100)
-n <- 10000; p <- 50
+n <- 5000; p <- 50
 
 leaf_res <- do.call(rbind, lapply(node_sizes, function(mns) {
   ates <- replicate(nreps, {
@@ -162,7 +162,7 @@ leaf_res$rmse <- round(leaf_res$rmse, 4)
 leaf_res$default <- ifelse(leaf_res$mns == heuristic, "<--", "")
 names(leaf_res) <- c("min.node.size", "Bias", "SD", "RMSE", "")
 knitr::kable(leaf_res, row.names = FALSE, align = "rrrrl",
-             caption = sprintf("Cross-fitted estimator (n = %s, p = %d, 5 reps). Arrow marks the adaptive default (mns = %d).",
+             caption = sprintf("Cross-fitted estimator (n = %s, p = %d, 2 reps). Arrow marks the adaptive default (mns = %d).",
                                format(n, big.mark = ","), p, heuristic))
 ```
 
@@ -203,7 +203,7 @@ leaf size.  Values of 2--5 all work well:
 
 ```{r folds, cache=TRUE}
 set.seed(123)
-nreps <- 5
+nreps <- 2
 n <- 5000
 
 fold_res <- do.call(rbind, lapply(c(2, 3, 5, 10), function(nfolds) {
