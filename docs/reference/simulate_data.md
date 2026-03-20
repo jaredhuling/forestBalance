@@ -8,7 +8,7 @@ known, allowing evaluation of estimator performance.
 ## Usage
 
 ``` r
-simulate_data(n = 500, p = 10, ate = 0, rho = -0.25, sigma = 1)
+simulate_data(n = 500, p = 10, ate = 0, rho = -0.25, sigma = 1, dgp = 1)
 ```
 
 ## Arguments
@@ -19,7 +19,8 @@ simulate_data(n = 500, p = 10, ate = 0, rho = -0.25, sigma = 1)
 
 - p:
 
-  Number of covariates. Must be at least 5. Default is 10.
+  Number of covariates. Must be at least 5 for `dgp = 1` and at least 8
+  for `dgp = 2`. Default is 10.
 
 - ate:
 
@@ -33,6 +34,11 @@ simulate_data(n = 500, p = 10, ate = 0, rho = -0.25, sigma = 1)
 - sigma:
 
   Noise standard deviation for the outcome. Default is 1.
+
+- dgp:
+
+  Integer selecting the data generating process. Default is 1. See
+  Details.
 
 ## Value
 
@@ -66,41 +72,37 @@ A list with the following elements:
 
   Number of covariates.
 
+- dgp:
+
+  The DGP that was used.
+
 ## Details
 
-The data generating process is:
+Both DGPs generate covariates from \\X \sim N(0, \Sigma)\\ where
+\\\Sigma\_{jk} = \rho^{\|j-k\|}\\.
 
-**Covariates:** \\X \sim N(0, \Sigma)\\ where \\\Sigma\_{jk} =
-\rho^{\|j-k\|}\\.
+**DGP 1** (default): Confounding through \\X_1\\ via a Beta density.
 
-**Propensity score:** \\P(A = 1 \mid X) = 0.25(1 + B(X_1; 2, 4))\\,
-where \\B(\cdot; 2, 4)\\ is the Beta(2,4) density. This creates a
-nonlinear relationship between \\X_1\\ and treatment assignment.
+- Propensity: \\P(A=1\|X) = 0.25(1 + B(X_1; 2, 4))\\ where \\B\\ is the
+  Beta(2,4) density.
 
-**Outcome model:** \$\$Y = 2(X_1 - 1) + 2\\B(X_1; 2, 4) + X_2 +
-2\\B(X_5; 2, 4) + \tau \cdot A + \varepsilon,\$\$ where \\\varepsilon
-\sim N(0, \sigma^2)\\ and \\\tau\\ is the ATE. Confounding arises
-because \\X_1\\ affects both the propensity score and the outcome
-nonlinearly.
+- Outcome: \\Y = 2(X_1-1) + 2 B(X_1;2,4) + X_2 + 2 B(X_5;2,4) + \tau A +
+  \varepsilon\\.
+
+**DGP 2**: Rich outcome surface with moderate confounding. Designed to
+illustrate the benefit of the augmented estimator. Confounding operates
+through \\X_1\\ and \\X_2\\, while the outcome depends on \\X_1, \ldots,
+X_8\\ with interactions and nonlinearities.
+
+- Propensity: \\P(A=1\|X) = \mathrm{logit}^{-1}(0.6 X_1 - 0.4 X_2 + 0.2
+  X_1 X_2)\\.
+
+- Outcome: \\Y = 2 X_1 + X_2^2 - 1.5 X_3 + \sin(2 X_4) + X_5 X_1 + 0.8
+  X_6 - \cos(X_7) + 0.5 X_8 + \tau A + \varepsilon\\.
 
 ## Examples
 
 ``` r
-dat <- simulate_data(n = 500, p = 10, ate = 0)
-str(dat)
-#> List of 7
-#>  $ X         : num [1:500, 1:10] -1.17 -1.51 2.69 0.23 -0.17 ...
-#>   ..- attr(*, "dimnames")=List of 2
-#>   .. ..$ : NULL
-#>   .. ..$ : chr [1:10] "X1" "X2" "X3" "X4" ...
-#>  $ A         : int [1:500] 0 0 0 1 0 0 1 0 0 0 ...
-#>  $ Y         : num [1:500] -4.703 -5.379 -0.876 1.799 2.629 ...
-#>  $ propensity: num [1:500] 0.25 0.25 0.25 0.775 0.25 ...
-#>  $ ate       : num 0
-#>  $ n         : num 500
-#>  $ p         : num 10
-
-# True ATE is 0, naive estimate is biased
-mean(dat$Y[dat$A == 1]) - mean(dat$Y[dat$A == 0])
-#> [1] 0.8173965
+dat1 <- simulate_data(n = 500, p = 10, dgp = 1)
+dat2 <- simulate_data(n = 500, p = 20, dgp = 2)
 ```

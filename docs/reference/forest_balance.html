@@ -29,6 +29,7 @@ on the same data used for treatment effect estimation."></head><body>
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/guide.html">Getting Started with forestBalance</a></li>
     <li><a class="dropdown-item" href="../articles/crossfitting.html">Cross-Fitting for Debiased Kernel Estimation</a></li>
+    <li><a class="dropdown-item" href="../articles/augmented.html">Augmented (Doubly-Robust) Estimation</a></li>
     <li><a class="dropdown-item" href="../articles/performance.html">Performance and Scalability</a></li>
   </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
@@ -67,6 +68,8 @@ on the same data used for treatment effect estimation.</p>
 <span>  min.node.size <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  cross.fitting <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  num.folds <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>  augmented <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  mu.hat <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  scale.outcomes <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  solver <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"auto"</span>, <span class="st">"direct"</span>, <span class="st">"cg"</span><span class="op">)</span>,</span>
 <span>  tol <span class="op">=</span> <span class="fl">5e-11</span>,</span>
@@ -114,6 +117,26 @@ sample.</p></dd>
 <code>cross.fitting = TRUE</code>.</p></dd>
 
 
+<dt id="arg-augmented">augmented<a class="anchor" aria-label="anchor" href="#arg-augmented"></a></dt>
+<dd><p>Logical; if <code>TRUE</code>, use an augmented (doubly-robust)
+estimator that combines the kernel energy balancing weights with
+group-specific outcome regression models. This reduces bias when either the
+kernel or the outcome models are correctly specified. Default is
+<code>FALSE</code>. See Details.</p></dd>
+
+
+<dt id="arg-mu-hat">mu.hat<a class="anchor" aria-label="anchor" href="#arg-mu-hat"></a></dt>
+<dd><p>Optional list with components <code>mu1</code> and <code>mu0</code>, each
+a numeric vector of length \(n\), containing user-supplied predictions of
+\(E[Y \mid X, A=1]\) and \(E[Y \mid X, A=0]\). When provided, these
+are used instead of fitting internal outcome models. If <code>NULL</code>
+(default) and <code>augmented = TRUE</code>, two
+<code><a href="https://rdrr.io/pkg/grf/man/regression_forest.html" class="external-link">regression_forest</a></code> models are fit automatically (one on
+treated, one on control). When supplying <code>mu.hat</code> with
+<code>cross.fitting = TRUE</code>, the user is responsible for ensuring the
+predictions were cross-fitted externally.</p></dd>
+
+
 <dt id="arg-scale-outcomes">scale.outcomes<a class="anchor" aria-label="anchor" href="#arg-scale-outcomes"></a></dt>
 <dd><p>If <code>TRUE</code> (default), the joint outcome matrix
 <code>cbind(A, Y)</code> is column-standardized before fitting the forest. This
@@ -147,6 +170,14 @@ used, this is the average of per-fold Hajek estimates (DML1).</p></dd>
 <dd><p>The balancing weight vector (length \(n\)). When
 cross-fitting is used, these are the concatenated per-fold weights.</p></dd>
 
+<dt>mu1.hat</dt>
+<dd><p>Predictions of \(E[Y|X, A=1]\) (length \(n\)), or
+<code>NULL</code> if <code>augmented = FALSE</code>.</p></dd>
+
+<dt>mu0.hat</dt>
+<dd><p>Predictions of \(E[Y|X, A=0]\) (length \(n\)), or
+<code>NULL</code> if <code>augmented = FALSE</code>.</p></dd>
+
 <dt>kernel</dt>
 <dd><p>The \(n \times n\) forest proximity kernel (sparse matrix),
 or <code>NULL</code> when cross-fitting or the CG solver is used.</p></dd>
@@ -166,6 +197,9 @@ is the last fold's forest.</p></dd>
 
 <dt>crossfit</dt>
 <dd><p>Logical indicating whether cross-fitting was used.</p></dd>
+
+<dt>augmented</dt>
+<dd><p>Logical indicating whether augmentation was used.</p></dd>
 
 <dt>num.folds</dt>
 <dd><p>Number of folds (if cross-fitting was used).</p></dd>
@@ -197,11 +231,22 @@ trained on all data <em>except</em> fold \(k\), and the kernel for fold
 \(k\) is built from that held-out forest's leaf predictions. This breaks
 the dependence between the kernel and the outcomes, reducing overfitting
 bias. The final ATE is the average of the per-fold Hajek estimates (DML1).</p>
+<p><strong>Augmented estimator</strong>: When <code>augmented = TRUE</code>, two
+group-specific outcome models \(\hat\mu_1(X) = E[Y|X, A=1]\) and
+\(\hat\mu_0(X) = E[Y|X, A=0]\) are fit, and the ATE is estimated via
+the doubly-robust formula:
+$$\hat\tau = \frac{1}{n}\sum_i [\hat\mu_1(X_i) - \hat\mu_0(X_i)]
+  + \frac{\sum w_i A_i (Y_i - \hat\mu_1(X_i))}{\sum w_i A_i}
+  - \frac{\sum w_i (1-A_i)(Y_i - \hat\mu_0(X_i))}{\sum w_i (1-A_i)}.$$
+The first term is the regression-based estimate of the ATE; the remaining
+terms are weighted bias corrections. This is consistent if either the kernel
+(balancing weights) or the outcome models are correctly specified. When
+combined with cross-fitting, the outcome models are automatically
+cross-fitted in lockstep with the kernel.</p>
 <p><strong>Adaptive leaf size</strong>: The default <code>min.node.size</code> is set
 adaptively via <code>max(20, min(floor(n/200) + p, floor(n/50)))</code>. Larger
 leaves produce smoother kernels that generalize better, while the cap at
-<code>n/50</code> prevents kernel degeneracy. This heuristic was calibrated
-empirically to minimize RMSE across a range of sample sizes and dimensions.</p>
+<code>n/50</code> prevents kernel degeneracy.</p>
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
@@ -237,6 +282,9 @@ effect estimation for high dimensional data.
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ESS: treated = 172/237 (73%)   control = 198/263 (75%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> -------------------------------------------------- </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Use summary() for covariate balance details.</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Augmented (doubly-robust) estimator</span></span></span>
+<span class="r-in"><span><span class="va">result_aug</span> <span class="op">&lt;-</span> <span class="fu">forest_balance</span><span class="op">(</span><span class="va">X</span>, <span class="va">A</span>, <span class="va">Y</span>, augmented <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Without cross-fitting</span></span></span>
 <span class="r-in"><span><span class="va">result_nocf</span> <span class="op">&lt;-</span> <span class="fu">forest_balance</span><span class="op">(</span><span class="va">X</span>, <span class="va">A</span>, <span class="va">Y</span>, cross.fitting <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>

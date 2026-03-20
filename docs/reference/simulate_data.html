@@ -25,6 +25,7 @@ estimator performance."></head><body>
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/guide.html">Getting Started with forestBalance</a></li>
     <li><a class="dropdown-item" href="../articles/crossfitting.html">Cross-Fitting for Debiased Kernel Estimation</a></li>
+    <li><a class="dropdown-item" href="../articles/augmented.html">Augmented (Doubly-Robust) Estimation</a></li>
     <li><a class="dropdown-item" href="../articles/performance.html">Performance and Scalability</a></li>
   </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
@@ -53,7 +54,7 @@ estimator performance.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">simulate_data</span><span class="op">(</span>n <span class="op">=</span> <span class="fl">500</span>, p <span class="op">=</span> <span class="fl">10</span>, ate <span class="op">=</span> <span class="fl">0</span>, rho <span class="op">=</span> <span class="op">-</span><span class="fl">0.25</span>, sigma <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">simulate_data</span><span class="op">(</span>n <span class="op">=</span> <span class="fl">500</span>, p <span class="op">=</span> <span class="fl">10</span>, ate <span class="op">=</span> <span class="fl">0</span>, rho <span class="op">=</span> <span class="op">-</span><span class="fl">0.25</span>, sigma <span class="op">=</span> <span class="fl">1</span>, dgp <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -65,7 +66,8 @@ estimator performance.</p>
 
 
 <dt id="arg-p">p<a class="anchor" aria-label="anchor" href="#arg-p"></a></dt>
-<dd><p>Number of covariates. Must be at least 5. Default is 10.</p></dd>
+<dd><p>Number of covariates. Must be at least 5 for <code>dgp = 1</code> and at
+least 8 for <code>dgp = 2</code>. Default is 10.</p></dd>
 
 
 <dt id="arg-ate">ate<a class="anchor" aria-label="anchor" href="#arg-ate"></a></dt>
@@ -79,6 +81,11 @@ covariates: \(\Sigma_{jk} = \rho^{|j-k|}\). Default is \(-0.25\).</p></dd>
 
 <dt id="arg-sigma">sigma<a class="anchor" aria-label="anchor" href="#arg-sigma"></a></dt>
 <dd><p>Noise standard deviation for the outcome. Default is 1.</p></dd>
+
+
+<dt id="arg-dgp">dgp<a class="anchor" aria-label="anchor" href="#arg-dgp"></a></dt>
+<dd><p>Integer selecting the data generating process. Default is 1.
+See Details.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -104,43 +111,34 @@ covariates: \(\Sigma_{jk} = \rho^{|j-k|}\). Default is \(-0.25\).</p></dd>
 <dt>p</dt>
 <dd><p>Number of covariates.</p></dd>
 
+<dt>dgp</dt>
+<dd><p>The DGP that was used.</p></dd>
+
 
 </dl></div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>The data generating process is:</p>
-<p><strong>Covariates:</strong> \(X \sim N(0, \Sigma)\) where
+    <p>Both DGPs generate covariates from \(X \sim N(0, \Sigma)\) where
 \(\Sigma_{jk} = \rho^{|j-k|}\).</p>
-<p><strong>Propensity score:</strong> \(P(A = 1 \mid X) = 0.25(1 + B(X_1; 2, 4))\), where
-\(B(\cdot; 2, 4)\) is the Beta(2,4) density. This creates a nonlinear
-relationship between \(X_1\) and treatment assignment.</p>
-<p><strong>Outcome model:</strong>
-$$Y = 2(X_1 - 1) + 2\,B(X_1; 2, 4) + X_2 + 2\,B(X_5; 2, 4)
-        + \tau \cdot A + \varepsilon,$$
-where \(\varepsilon \sim N(0, \sigma^2)\) and \(\tau\) is the ATE.
-Confounding arises because \(X_1\) affects both the propensity score and
-the outcome nonlinearly.</p>
-    </div>
+<p><strong>DGP 1</strong> (default): Confounding through \(X_1\) via a Beta density.</p>
+<ul><li><p>Propensity: \(P(A=1|X) = 0.25(1 + B(X_1; 2, 4))\) where
+\(B\) is the Beta(2,4) density.</p></li>
+<li><p>Outcome: \(Y = 2(X_1-1) + 2 B(X_1;2,4) + X_2 + 2 B(X_5;2,4)
+    + \tau A + \varepsilon\).</p></li>
+</ul><p><strong>DGP 2</strong>: Rich outcome surface with moderate confounding. Designed to
+illustrate the benefit of the augmented estimator. Confounding operates
+through \(X_1\) and \(X_2\), while the outcome depends on
+\(X_1, \ldots, X_8\) with interactions and nonlinearities.</p>
+<ul><li><p>Propensity: \(P(A=1|X) = \mathrm{logit}^{-1}(0.6 X_1 - 0.4 X_2
+    + 0.2 X_1 X_2)\).</p></li>
+<li><p>Outcome: \(Y = 2 X_1 + X_2^2 - 1.5 X_3 + \sin(2 X_4) +
+    X_5 X_1 + 0.8 X_6 - \cos(X_7) + 0.5 X_8 + \tau A + \varepsilon\).</p></li>
+</ul></div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu">simulate_data</span><span class="op">(</span>n <span class="op">=</span> <span class="fl">500</span>, p <span class="op">=</span> <span class="fl">10</span>, ate <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">dat</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> List of 7</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ X         : num [1:500, 1:10] -1.17 -1.51 2.69 0.23 -0.17 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "dimnames")=List of 2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..$ : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..$ : chr [1:10] "X1" "X2" "X3" "X4" ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ A         : int [1:500] 0 0 0 1 0 0 1 0 0 0 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ Y         : num [1:500] -4.703 -5.379 -0.876 1.799 2.629 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ propensity: num [1:500] 0.25 0.25 0.25 0.775 0.25 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ ate       : num 0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ n         : num 500</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ p         : num 10</span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># True ATE is 0, naive estimate is biased</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">Y</span><span class="op">[</span><span class="va">dat</span><span class="op">$</span><span class="va">A</span> <span class="op">==</span> <span class="fl">1</span><span class="op">]</span><span class="op">)</span> <span class="op">-</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">Y</span><span class="op">[</span><span class="va">dat</span><span class="op">$</span><span class="va">A</span> <span class="op">==</span> <span class="fl">0</span><span class="op">]</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.8173965</span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">dat1</span> <span class="op">&lt;-</span> <span class="fu">simulate_data</span><span class="op">(</span>n <span class="op">=</span> <span class="fl">500</span>, p <span class="op">=</span> <span class="fl">10</span>, dgp <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">dat2</span> <span class="op">&lt;-</span> <span class="fu">simulate_data</span><span class="op">(</span>n <span class="op">=</span> <span class="fl">500</span>, p <span class="op">=</span> <span class="fl">20</span>, dgp <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

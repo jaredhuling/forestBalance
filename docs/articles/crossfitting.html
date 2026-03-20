@@ -34,6 +34,7 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/guide.html">Getting Started with forestBalance</a></li>
     <li><a class="dropdown-item" href="../articles/crossfitting.html">Cross-Fitting for Debiased Kernel Estimation</a></li>
+    <li><a class="dropdown-item" href="../articles/augmented.html">Augmented (Doubly-Robust) Estimation</a></li>
     <li><a class="dropdown-item" href="../articles/performance.html">Performance and Scalability</a></li>
   </ul>
 </li>
@@ -318,13 +319,13 @@ The adaptive default balances bias reduction against variance.</p>
 <span><span class="va">fit</span></span>
 <span><span class="co">#&gt; Forest Kernel Energy Balancing (cross-fitted)</span></span>
 <span><span class="co">#&gt; -------------------------------------------------- </span></span>
-<span><span class="co">#&gt;   n = 2,000  (n_treated = 717, n_control = 1283)</span></span>
+<span><span class="co">#&gt;   n = 2,000  (n_treated = 690, n_control = 1310)</span></span>
 <span><span class="co">#&gt;   Trees: 1000</span></span>
 <span><span class="co">#&gt;   Cross-fitting: 2 folds</span></span>
 <span><span class="co">#&gt;   Solver: direct</span></span>
-<span><span class="co">#&gt;   ATE estimate: 0.1097</span></span>
-<span><span class="co">#&gt;   Fold ATEs: 0.1429, 0.0765</span></span>
-<span><span class="co">#&gt;   ESS: treated = 486/717 (68%)   control = 945/1283 (74%)</span></span>
+<span><span class="co">#&gt;   ATE estimate: 0.0646</span></span>
+<span><span class="co">#&gt;   Fold ATEs: 0.0218, 0.1075</span></span>
+<span><span class="co">#&gt;   ESS: treated = 469/690 (68%)   control = 995/1310 (76%)</span></span>
 <span><span class="co">#&gt; -------------------------------------------------- </span></span>
 <span><span class="co">#&gt; Use summary() for covariate balance details.</span></span></code></pre></div>
 <p>To disable cross-fitting (e.g., for speed or to inspect the
@@ -334,11 +335,11 @@ kernel):</p>
 <span><span class="va">fit_nocf</span></span>
 <span><span class="co">#&gt; Forest Kernel Energy Balancing</span></span>
 <span><span class="co">#&gt; -------------------------------------------------- </span></span>
-<span><span class="co">#&gt;   n = 2,000  (n_treated = 717, n_control = 1283)</span></span>
+<span><span class="co">#&gt;   n = 2,000  (n_treated = 690, n_control = 1310)</span></span>
 <span><span class="co">#&gt;   Trees: 1000</span></span>
 <span><span class="co">#&gt;   Solver: direct</span></span>
-<span><span class="co">#&gt;   ATE estimate: 0.0521</span></span>
-<span><span class="co">#&gt;   ESS: treated = 420/717 (59%)   control = 886/1283 (69%)</span></span>
+<span><span class="co">#&gt;   ATE estimate: 0.0664</span></span>
+<span><span class="co">#&gt;   ESS: treated = 399/690 (58%)   control = 909/1310 (69%)</span></span>
 <span><span class="co">#&gt; -------------------------------------------------- </span></span>
 <span><span class="co">#&gt; Use summary() for covariate balance details.</span></span></code></pre></div>
 <p>To manually set the leaf size:</p>
@@ -347,13 +348,13 @@ kernel):</p>
 <span><span class="va">fit_custom</span></span>
 <span><span class="co">#&gt; Forest Kernel Energy Balancing (cross-fitted)</span></span>
 <span><span class="co">#&gt; -------------------------------------------------- </span></span>
-<span><span class="co">#&gt;   n = 2,000  (n_treated = 717, n_control = 1283)</span></span>
+<span><span class="co">#&gt;   n = 2,000  (n_treated = 690, n_control = 1310)</span></span>
 <span><span class="co">#&gt;   Trees: 1000</span></span>
 <span><span class="co">#&gt;   Cross-fitting: 2 folds</span></span>
 <span><span class="co">#&gt;   Solver: direct</span></span>
-<span><span class="co">#&gt;   ATE estimate: 0.0277</span></span>
-<span><span class="co">#&gt;   Fold ATEs: -0.0616, 0.1171</span></span>
-<span><span class="co">#&gt;   ESS: treated = 406/717 (57%)   control = 836/1283 (65%)</span></span>
+<span><span class="co">#&gt;   ATE estimate: 0.0274</span></span>
+<span><span class="co">#&gt;   Fold ATEs: -0.02, 0.0749</span></span>
+<span><span class="co">#&gt;   ESS: treated = 400/690 (58%)   control = 851/1310 (65%)</span></span>
 <span><span class="co">#&gt; -------------------------------------------------- </span></span>
 <span><span class="co">#&gt; Use summary() for covariate balance details.</span></span></code></pre></div>
 </div>

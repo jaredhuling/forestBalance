@@ -167,13 +167,13 @@ fit <- forest_balance(dat$X, dat$A, dat$Y)
 fit
 #> Forest Kernel Energy Balancing (cross-fitted)
 #> -------------------------------------------------- 
-#>   n = 2,000  (n_treated = 717, n_control = 1283)
+#>   n = 2,000  (n_treated = 690, n_control = 1310)
 #>   Trees: 1000
 #>   Cross-fitting: 2 folds
 #>   Solver: direct
-#>   ATE estimate: 0.1097
-#>   Fold ATEs: 0.1429, 0.0765
-#>   ESS: treated = 486/717 (68%)   control = 945/1283 (74%)
+#>   ATE estimate: 0.0646
+#>   Fold ATEs: 0.0218, 0.1075
+#>   ESS: treated = 469/690 (68%)   control = 995/1310 (76%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
 ```
@@ -185,11 +185,11 @@ fit_nocf <- forest_balance(dat$X, dat$A, dat$Y, cross.fitting = FALSE)
 fit_nocf
 #> Forest Kernel Energy Balancing
 #> -------------------------------------------------- 
-#>   n = 2,000  (n_treated = 717, n_control = 1283)
+#>   n = 2,000  (n_treated = 690, n_control = 1310)
 #>   Trees: 1000
 #>   Solver: direct
-#>   ATE estimate: 0.0521
-#>   ESS: treated = 420/717 (59%)   control = 886/1283 (69%)
+#>   ATE estimate: 0.0664
+#>   ESS: treated = 399/690 (58%)   control = 909/1310 (69%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
 ```
@@ -201,13 +201,13 @@ fit_custom <- forest_balance(dat$X, dat$A, dat$Y, min.node.size = 50)
 fit_custom
 #> Forest Kernel Energy Balancing (cross-fitted)
 #> -------------------------------------------------- 
-#>   n = 2,000  (n_treated = 717, n_control = 1283)
+#>   n = 2,000  (n_treated = 690, n_control = 1310)
 #>   Trees: 1000
 #>   Cross-fitting: 2 folds
 #>   Solver: direct
-#>   ATE estimate: 0.0277
-#>   Fold ATEs: -0.0616, 0.1171
-#>   ESS: treated = 406/717 (57%)   control = 836/1283 (65%)
+#>   ATE estimate: 0.0274
+#>   Fold ATEs: -0.02, 0.0749
+#>   ESS: treated = 400/690 (58%)   control = 851/1310 (65%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
 ```

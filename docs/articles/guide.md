@@ -42,7 +42,7 @@ dat <- simulate_data(n = 800, p = 10, ate = 0)
 c("True ATE"  = dat$ate,
   "Naive ATE" = round(mean(dat$Y[dat$A == 1]) - mean(dat$Y[dat$A == 0]), 4))
 #>  True ATE Naive ATE 
-#>    0.0000    0.9812
+#>    0.0000    1.7054
 ```
 
 The naive difference-in-means is badly biased because of confounding.
@@ -56,13 +56,13 @@ fit_fb <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 1000)
 fit_fb
 #> Forest Kernel Energy Balancing (cross-fitted)
 #> -------------------------------------------------- 
-#>   n = 800  (n_treated = 275, n_control = 525)
+#>   n = 800  (n_treated = 284, n_control = 516)
 #>   Trees: 1000
 #>   Cross-fitting: 2 folds
 #>   Solver: direct
-#>   ATE estimate: -0.0360
-#>   Fold ATEs: 0.1191, -0.191
-#>   ESS: treated = 183/275 (67%)   control = 398/525 (76%)
+#>   ATE estimate: 0.0741
+#>   Fold ATEs: 0.1184, 0.0298
+#>   ESS: treated = 190/284 (67%)   control = 386/516 (75%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
 ```
@@ -94,13 +94,13 @@ ate_energy <- weighted.mean(dat$Y[dat$A == 1], fit_energy$weights[dat$A == 1]) -
 
 ### Comparison
 
-| Method            |     ATE |
-|:------------------|--------:|
-| Naive             |  0.9812 |
-| Entropy balancing |  0.8246 |
-| Energy balancing  |  0.6277 |
-| Forest balance    | -0.0360 |
-| Truth             |  0.0000 |
+| Method            |    ATE |
+|:------------------|-------:|
+| Naive             | 1.7054 |
+| Entropy balancing | 1.1515 |
+| Energy balancing  | 1.0032 |
+| Forest balance    | 0.0741 |
+| Truth             | 0.0000 |
 
 Single-replication ATE estimates.
 
@@ -124,54 +124,54 @@ colnames(X.nl) <- c("X1^2", "X2^2", "X5^2", "X1*X2", "X1*X5",
 summary(fit_fb, X.trans = X.nl)
 #> Forest Kernel Energy Balancing
 #> ============================================================ 
-#>   n = 800  (n_treated = 275, n_control = 525)
+#>   n = 800  (n_treated = 284, n_control = 516)
 #>   Trees: 1000
 #>   Solver: CG (kernel not materialized)
 #> 
-#>   ATE estimate: -0.0360
+#>   ATE estimate: 0.0741
 #> ============================================================ 
 #> 
 #> Covariate Balance (|SMD|)
 #> ------------------------------------------------------------ 
 #>   Covariate     Unweighted      Weighted
 #>   ----------  ------------  ------------
-#>   X1              0.1668 *        0.0244
-#>   X2              0.2956 *        0.0234
-#>   X3                0.0277        0.0070
-#>   X4              0.1102 *        0.0174
-#>   X5                0.0430        0.0138
-#>   X6                0.0189        0.0059
-#>   X7                0.0945        0.0362
-#>   X8                0.0733        0.0163
-#>   X9                0.0332        0.0268
-#>   X10               0.0734        0.0357
+#>   X1              0.2467 *        0.0082
+#>   X2                0.0052        0.0178
+#>   X3                0.0690        0.0167
+#>   X4                0.0096        0.0036
+#>   X5                0.0382        0.0286
+#>   X6                0.0633        0.0236
+#>   X7                0.0354        0.0375
+#>   X8                0.0040        0.0236
+#>   X9              0.1140 *        0.0083
+#>   X10             0.1740 *      0.1085 *
 #>   ----------  ------------  ------------
-#>   Max |SMD|         0.2956        0.0362
+#>   Max |SMD|         0.2467        0.1085
 #>   (* indicates |SMD| > 0.10)
 #> 
 #> Transformed Covariate Balance (|SMD|)
 #> ------------------------------------------------------------ 
 #>   Transform     Unweighted      Weighted
 #>   ----------  ------------  ------------
-#>   X1^2            0.2904 *        0.0048
-#>   X2^2              0.0941        0.0520
-#>   X5^2              0.0841        0.0863
-#>   X1*X2           0.1303 *        0.0002
-#>   X1*X5             0.0573        0.0542
-#>   Beta(X1)        0.6847 *        0.0243
-#>   Beta(X5)          0.0289        0.0508
+#>   X1^2            0.1769 *        0.0440
+#>   X2^2              0.0125        0.0061
+#>   X5^2              0.0453        0.0548
+#>   X1*X2             0.0397        0.0284
+#>   X1*X5             0.0407        0.0009
+#>   Beta(X1)        0.7025 *        0.0258
+#>   Beta(X5)        0.1256 *        0.0041
 #>   ----------  ------------  ------------
-#>   Max |SMD|         0.6847        0.0863
+#>   Max |SMD|         0.7025        0.0548
 #> 
 #> Effective Sample Size
 #> ------------------------------------------------------------ 
-#>   Treated: 183 / 275  (67%)
-#>   Control: 398 / 525  (76%)
+#>   Treated: 190 / 284  (67%)
+#>   Control: 386 / 516  (75%)
 #> 
 #> Energy Distance
 #> ------------------------------------------------------------ 
-#>   Unweighted: 0.0486
-#>   Weighted:   0.0149
+#>   Unweighted: 0.0397
+#>   Weighted:   0.0173
 #> ============================================================
 ```
 
@@ -188,10 +188,10 @@ bal_unwtd  <- compute_balance(dat$X, dat$A, rep(1, dat$n), X.trans = X.nl)
 
 | Method | Max SMD (linear) | Max SMD (nonlinear) | ESS treated | ESS control |
 |:---|---:|---:|:---|:---|
-| Unweighted | 0.2956 | 0.6847 | 100% | 100% |
-| Entropy balancing | 0.0000 | 0.6213 | 93% | 98% |
-| Energy balancing | 0.0074 | 0.4879 | 84% | 87% |
-| Forest balance | 0.0362 | 0.0863 | 67% | 76% |
+| Unweighted | 0.2467 | 0.7025 | 100% | 100% |
+| Entropy balancing | 0.0000 | 0.6375 | 94% | 98% |
+| Energy balancing | 0.0123 | 0.5748 | 84% | 87% |
+| Forest balance | 0.1085 | 0.0548 | 67% | 75% |
 
 Balance diagnostics across methods.
 
@@ -283,7 +283,7 @@ dim(leaf_mat)
 K <- leaf_node_kernel(leaf_mat)
 c("kernel % nonzero" = round(100 * length(K@x) / prod(dim(K)), 1))
 #> kernel % nonzero 
-#>             30.2
+#>             29.7
 
 # 4. Compute balancing weights
 bal <- kernel_balance(dat$A, K)
@@ -291,5 +291,5 @@ bal <- kernel_balance(dat$A, K)
 # 5. Estimate ATE
 weighted.mean(dat$Y[dat$A == 1], bal$weights[dat$A == 1]) -
   weighted.mean(dat$Y[dat$A == 0], bal$weights[dat$A == 0])
-#> [1] 0.09462431
+#> [1] 0.2321743
 ```

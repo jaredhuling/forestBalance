@@ -18,6 +18,8 @@ forest_balance(
   min.node.size = NULL,
   cross.fitting = TRUE,
   num.folds = 2,
+  augmented = FALSE,
+  mu.hat = NULL,
   scale.outcomes = TRUE,
   solver = c("auto", "direct", "cg"),
   tol = 5e-11,
@@ -62,6 +64,26 @@ forest_balance(
   Number of cross-fitting folds. Default is 2. Only used when
   `cross.fitting = TRUE`.
 
+- augmented:
+
+  Logical; if `TRUE`, use an augmented (doubly-robust) estimator that
+  combines the kernel energy balancing weights with group-specific
+  outcome regression models. This reduces bias when either the kernel or
+  the outcome models are correctly specified. Default is `FALSE`. See
+  Details.
+
+- mu.hat:
+
+  Optional list with components `mu1` and `mu0`, each a numeric vector
+  of length \\n\\, containing user-supplied predictions of \\E\[Y \mid
+  X, A=1\]\\ and \\E\[Y \mid X, A=0\]\\. When provided, these are used
+  instead of fitting internal outcome models. If `NULL` (default) and
+  `augmented = TRUE`, two
+  [`regression_forest`](https://rdrr.io/pkg/grf/man/regression_forest.html)
+  models are fit automatically (one on treated, one on control). When
+  supplying `mu.hat` with `cross.fitting = TRUE`, the user is
+  responsible for ensuring the predictions were cross-fitted externally.
+
 - scale.outcomes:
 
   If `TRUE` (default), the joint outcome matrix `cbind(A, Y)` is
@@ -100,6 +122,16 @@ elements:
   The balancing weight vector (length \\n\\). When cross-fitting is
   used, these are the concatenated per-fold weights.
 
+- mu1.hat:
+
+  Predictions of \\E\[Y\|X, A=1\]\\ (length \\n\\), or `NULL` if
+  `augmented = FALSE`.
+
+- mu0.hat:
+
+  Predictions of \\E\[Y\|X, A=0\]\\ (length \\n\\), or `NULL` if
+  `augmented = FALSE`.
+
 - kernel:
 
   The \\n \times n\\ forest proximity kernel (sparse matrix), or `NULL`
@@ -125,6 +157,10 @@ elements:
 - crossfit:
 
   Logical indicating whether cross-fitting was used.
+
+- augmented:
+
+  Logical indicating whether augmentation was used.
 
 - num.folds:
 
@@ -168,11 +204,23 @@ from that held-out forest's leaf predictions. This breaks the dependence
 between the kernel and the outcomes, reducing overfitting bias. The
 final ATE is the average of the per-fold Hajek estimates (DML1).
 
+**Augmented estimator**: When `augmented = TRUE`, two group-specific
+outcome models \\\hat\mu_1(X) = E\[Y\|X, A=1\]\\ and \\\hat\mu_0(X) =
+E\[Y\|X, A=0\]\\ are fit, and the ATE is estimated via the doubly-robust
+formula: \$\$\hat\tau = \frac{1}{n}\sum_i \[\hat\mu_1(X_i) -
+\hat\mu_0(X_i)\] + \frac{\sum w_i A_i (Y_i - \hat\mu_1(X_i))}{\sum w_i
+A_i} - \frac{\sum w_i (1-A_i)(Y_i - \hat\mu_0(X_i))}{\sum w_i
+(1-A_i)}.\$\$ The first term is the regression-based estimate of the
+ATE; the remaining terms are weighted bias corrections. This is
+consistent if either the kernel (balancing weights) or the outcome
+models are correctly specified. When combined with cross-fitting, the
+outcome models are automatically cross-fitted in lockstep with the
+kernel.
+
 **Adaptive leaf size**: The default `min.node.size` is set adaptively
 via `max(20, min(floor(n/200) + p, floor(n/50)))`. Larger leaves produce
 smoother kernels that generalize better, while the cap at `n/50`
-prevents kernel degeneracy. This heuristic was calibrated empirically to
-minimize RMSE across a range of sample sizes and dimensions.
+prevents kernel degeneracy.
 
 ## References
 
@@ -209,6 +257,9 @@ result
 #>   ESS: treated = 172/237 (73%)   control = 198/263 (75%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
+
+# Augmented (doubly-robust) estimator
+result_aug <- forest_balance(X, A, Y, augmented = TRUE)
 
 # Without cross-fitting
 result_nocf <- forest_balance(X, A, Y, cross.fitting = FALSE)
