@@ -14,6 +14,8 @@ navbar:
           href: articles/guide.html
         - text: Cross-Fitting for Debiased Kernel Estimation
           href: articles/crossfitting.html
+        - text: Augmented (Doubly-Robust) Estimation
+          href: articles/augmented.html
         - text: Performance and Scalability
           href: articles/performance.html
 
@@ -22,4 +24,5 @@ articles:
     contents:
       - guide
       - crossfitting
+      - augmented
       - performance

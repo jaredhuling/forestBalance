@@ -12,6 +12,8 @@ forest_balance(
   min.node.size = NULL,
   cross.fitting = TRUE,
   num.folds = 2,
+  augmented = FALSE,
+  mu.hat = NULL,
   scale.outcomes = TRUE,
   solver = c("auto", "direct", "cg"),
   tol = 5e-11,
@@ -41,6 +43,22 @@ sample.}
 \item{num.folds}{Number of cross-fitting folds. Default is 2. Only used when
 \code{cross.fitting = TRUE}.}
 
+\item{augmented}{Logical; if \code{TRUE}, use an augmented (doubly-robust)
+estimator that combines the kernel energy balancing weights with
+group-specific outcome regression models. This reduces bias when either the
+kernel or the outcome models are correctly specified. Default is
+\code{FALSE}. See Details.}
+
+\item{mu.hat}{Optional list with components \code{mu1} and \code{mu0}, each
+a numeric vector of length \eqn{n}, containing user-supplied predictions of
+\eqn{E[Y \mid X, A=1]} and \eqn{E[Y \mid X, A=0]}. When provided, these
+are used instead of fitting internal outcome models. If \code{NULL}
+(default) and \code{augmented = TRUE}, two
+\code{\link[grf]{regression_forest}} models are fit automatically (one on
+treated, one on control). When supplying \code{mu.hat} with
+\code{cross.fitting = TRUE}, the user is responsible for ensuring the
+predictions were cross-fitted externally.}
+
 \item{scale.outcomes}{If \code{TRUE} (default), the joint outcome matrix
 \code{cbind(A, Y)} is column-standardized before fitting the forest. This
 ensures that treatment and outcome contribute equally to the splits.}
@@ -63,6 +81,10 @@ following elements:
 used, this is the average of per-fold Hajek estimates (DML1).}
 \item{weights}{The balancing weight vector (length \eqn{n}). When
 cross-fitting is used, these are the concatenated per-fold weights.}
+\item{mu1.hat}{Predictions of \eqn{E[Y|X, A=1]} (length \eqn{n}), or
+\code{NULL} if \code{augmented = FALSE}.}
+\item{mu0.hat}{Predictions of \eqn{E[Y|X, A=0]} (length \eqn{n}), or
+\code{NULL} if \code{augmented = FALSE}.}
 \item{kernel}{The \eqn{n \times n} forest proximity kernel (sparse matrix),
 or \code{NULL} when cross-fitting or the CG solver is used.}
 \item{forest}{The trained forest object. When cross-fitting is used, this
@@ -71,6 +93,7 @@ is the last fold's forest.}
 \item{n, n1, n0}{Total, treated, and control sample sizes.}
 \item{solver}{The solver that was used (\code{"direct"} or \code{"cg"}).}
 \item{crossfit}{Logical indicating whether cross-fitting was used.}
+\item{augmented}{Logical indicating whether augmentation was used.}
 \item{num.folds}{Number of folds (if cross-fitting was used).}
 \item{fold_ates}{Per-fold ATE estimates (if cross-fitting was used).}
 \item{fold_ids}{Fold assignments (if cross-fitting was used).}
@@ -107,11 +130,23 @@ trained on all data \emph{except} fold \eqn{k}, and the kernel for fold
 the dependence between the kernel and the outcomes, reducing overfitting
 bias. The final ATE is the average of the per-fold Hajek estimates (DML1).
 
+\strong{Augmented estimator}: When \code{augmented = TRUE}, two
+group-specific outcome models \eqn{\hat\mu_1(X) = E[Y|X, A=1]} and
+\eqn{\hat\mu_0(X) = E[Y|X, A=0]} are fit, and the ATE is estimated via
+the doubly-robust formula:
+\deqn{\hat\tau = \frac{1}{n}\sum_i [\hat\mu_1(X_i) - \hat\mu_0(X_i)]
+  + \frac{\sum w_i A_i (Y_i - \hat\mu_1(X_i))}{\sum w_i A_i}
+  - \frac{\sum w_i (1-A_i)(Y_i - \hat\mu_0(X_i))}{\sum w_i (1-A_i)}.}
+The first term is the regression-based estimate of the ATE; the remaining
+terms are weighted bias corrections. This is consistent if either the kernel
+(balancing weights) or the outcome models are correctly specified. When
+combined with cross-fitting, the outcome models are automatically
+cross-fitted in lockstep with the kernel.
+
 \strong{Adaptive leaf size}: The default \code{min.node.size} is set
 adaptively via \code{max(20, min(floor(n/200) + p, floor(n/50)))}. Larger
 leaves produce smoother kernels that generalize better, while the cap at
-\code{n/50} prevents kernel degeneracy. This heuristic was calibrated
-empirically to minimize RMSE across a range of sample sizes and dimensions.
+\code{n/50} prevents kernel degeneracy.
 }
 \examples{
 \donttest{
@@ -124,6 +159,9 @@ Y <- X[, 1] + rnorm(n)  # true ATE = 0
 # Default: cross-fitting with adaptive leaf size
 result <- forest_balance(X, A, Y)
 result
+
+# Augmented (doubly-robust) estimator
+result_aug <- forest_balance(X, A, Y, augmented = TRUE)
 
 # Without cross-fitting
 result_nocf <- forest_balance(X, A, Y, cross.fitting = FALSE)

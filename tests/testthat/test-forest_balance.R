@@ -38,6 +38,38 @@ test_that("forest_balance errors on invalid input", {
   expect_error(forest_balance(dat$X, rep(2, 100), dat$Y), "binary")
 })
 
+test_that("forest_balance augmented estimator works", {
+  dat <- simulate_data(n = 300, p = 5)
+  fit_aug <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 50,
+                             augmented = TRUE)
+  expect_true(fit_aug$augmented)
+  expect_length(fit_aug$mu1.hat, 300)
+  expect_length(fit_aug$mu0.hat, 300)
+  expect_type(fit_aug$ate, "double")
+  expect_output(print(fit_aug), "doubly-robust")
+})
+
+test_that("forest_balance augmented with user-supplied mu.hat works", {
+  dat <- simulate_data(n = 200, p = 5)
+  mu_hat <- list(mu1 = rep(mean(dat$Y[dat$A == 1]), 200),
+                 mu0 = rep(mean(dat$Y[dat$A == 0]), 200))
+  fit <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 50,
+                         mu.hat = mu_hat)
+  expect_true(fit$augmented)
+  expect_equal(fit$mu1.hat, mu_hat$mu1)
+  expect_equal(fit$mu0.hat, mu_hat$mu0)
+})
+
+test_that("forest_balance augmented without cross-fitting works", {
+  dat <- simulate_data(n = 200, p = 5)
+  fit <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 50,
+                         augmented = TRUE, cross.fitting = FALSE)
+  expect_true(fit$augmented)
+  expect_false(isTRUE(fit$crossfit))
+  expect_length(fit$mu1.hat, 200)
+  expect_length(fit$mu0.hat, 200)
+})
+
 test_that("forest_balance print and summary work", {
   dat <- simulate_data(n = 200, p = 5)
   fit <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 50)

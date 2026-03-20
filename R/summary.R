@@ -28,6 +28,9 @@ print.forest_balance <- function(x, ...) {
   if (is_cf) {
     cat(sprintf("  Cross-fitting: %d folds\n", x$num.folds))
   }
+  if (isTRUE(x$augmented)) {
+    cat("  Augmented: yes (doubly-robust)\n")
+  }
   cat(sprintf("  Solver: %s\n", x$solver))
   cat(sprintf("  ATE estimate: %.4f\n", x$ate))
 

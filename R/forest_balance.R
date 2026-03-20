@@ -22,6 +22,20 @@
 #'   sample.
 #' @param num.folds Number of cross-fitting folds. Default is 2. Only used when
 #'   \code{cross.fitting = TRUE}.
+#' @param augmented Logical; if \code{TRUE}, use an augmented (doubly-robust)
+#'   estimator that combines the kernel energy balancing weights with
+#'   group-specific outcome regression models. This reduces bias when either the
+#'   kernel or the outcome models are correctly specified. Default is
+#'   \code{FALSE}. See Details.
+#' @param mu.hat Optional list with components \code{mu1} and \code{mu0}, each
+#'   a numeric vector of length \eqn{n}, containing user-supplied predictions of
+#'   \eqn{E[Y \mid X, A=1]} and \eqn{E[Y \mid X, A=0]}. When provided, these
+#'   are used instead of fitting internal outcome models. If \code{NULL}
+#'   (default) and \code{augmented = TRUE}, two
+#'   \code{\link[grf]{regression_forest}} models are fit automatically (one on
+#'   treated, one on control). When supplying \code{mu.hat} with
+#'   \code{cross.fitting = TRUE}, the user is responsible for ensuring the
+#'   predictions were cross-fitted externally.
 #' @param scale.outcomes If \code{TRUE} (default), the joint outcome matrix
 #'   \code{cbind(A, Y)} is column-standardized before fitting the forest. This
 #'   ensures that treatment and outcome contribute equally to the splits.
@@ -40,6 +54,10 @@
 #'     used, this is the average of per-fold Hajek estimates (DML1).}
 #'   \item{weights}{The balancing weight vector (length \eqn{n}). When
 #'     cross-fitting is used, these are the concatenated per-fold weights.}
+#'   \item{mu1.hat}{Predictions of \eqn{E[Y|X, A=1]} (length \eqn{n}), or
+#'     \code{NULL} if \code{augmented = FALSE}.}
+#'   \item{mu0.hat}{Predictions of \eqn{E[Y|X, A=0]} (length \eqn{n}), or
+#'     \code{NULL} if \code{augmented = FALSE}.}
 #'   \item{kernel}{The \eqn{n \times n} forest proximity kernel (sparse matrix),
 #'     or \code{NULL} when cross-fitting or the CG solver is used.}
 #'   \item{forest}{The trained forest object. When cross-fitting is used, this
@@ -48,6 +66,7 @@
 #'   \item{n, n1, n0}{Total, treated, and control sample sizes.}
 #'   \item{solver}{The solver that was used (\code{"direct"} or \code{"cg"}).}
 #'   \item{crossfit}{Logical indicating whether cross-fitting was used.}
+#'   \item{augmented}{Logical indicating whether augmentation was used.}
 #'   \item{num.folds}{Number of folds (if cross-fitting was used).}
 #'   \item{fold_ates}{Per-fold ATE estimates (if cross-fitting was used).}
 #'   \item{fold_ids}{Fold assignments (if cross-fitting was used).}
@@ -76,11 +95,23 @@
 #' the dependence between the kernel and the outcomes, reducing overfitting
 #' bias. The final ATE is the average of the per-fold Hajek estimates (DML1).
 #'
+#' \strong{Augmented estimator}: When \code{augmented = TRUE}, two
+#' group-specific outcome models \eqn{\hat\mu_1(X) = E[Y|X, A=1]} and
+#' \eqn{\hat\mu_0(X) = E[Y|X, A=0]} are fit, and the ATE is estimated via
+#' the doubly-robust formula:
+#' \deqn{\hat\tau = \frac{1}{n}\sum_i [\hat\mu_1(X_i) - \hat\mu_0(X_i)]
+#'   + \frac{\sum w_i A_i (Y_i - \hat\mu_1(X_i))}{\sum w_i A_i}
+#'   - \frac{\sum w_i (1-A_i)(Y_i - \hat\mu_0(X_i))}{\sum w_i (1-A_i)}.}
+#' The first term is the regression-based estimate of the ATE; the remaining
+#' terms are weighted bias corrections. This is consistent if either the kernel
+#' (balancing weights) or the outcome models are correctly specified. When
+#' combined with cross-fitting, the outcome models are automatically
+#' cross-fitted in lockstep with the kernel.
+#'
 #' \strong{Adaptive leaf size}: The default \code{min.node.size} is set
 #' adaptively via \code{max(20, min(floor(n/200) + p, floor(n/50)))}. Larger
 #' leaves produce smoother kernels that generalize better, while the cap at
-#' \code{n/50} prevents kernel degeneracy. This heuristic was calibrated
-#' empirically to minimize RMSE across a range of sample sizes and dimensions.
+#' \code{n/50} prevents kernel degeneracy.
 #'
 #' @references
 #' Chernozhukov, V., Chetverikov, D., Demirer, M., Duflo, E., Hansen, C.,
@@ -104,18 +135,23 @@
 #' result <- forest_balance(X, A, Y)
 #' result
 #'
+#' # Augmented (doubly-robust) estimator
+#' result_aug <- forest_balance(X, A, Y, augmented = TRUE)
+#'
 #' # Without cross-fitting
 #' result_nocf <- forest_balance(X, A, Y, cross.fitting = FALSE)
 #' }
 #'
-#' @importFrom grf multi_regression_forest
-#' @importFrom stats weighted.mean
+#' @importFrom grf multi_regression_forest regression_forest
+#' @importFrom stats predict weighted.mean
 #' @export
 forest_balance <- function(X, A, Y,
                            num.trees = 1000,
                            min.node.size = NULL,
                            cross.fitting = TRUE,
                            num.folds = 2,
+                           augmented = FALSE,
+                           mu.hat = NULL,
                            scale.outcomes = TRUE,
                            solver = c("auto", "direct", "cg"),
                            tol = 5e-11,
@@ -125,145 +161,275 @@ forest_balance <- function(X, A, Y,
   n <- nrow(X)
   p <- ncol(X)
 
+  .validate_inputs(X, A, Y, mu.hat, cross.fitting, num.folds, n)
+  if (!is.null(mu.hat)) augmented <- TRUE
+
+  if (is.null(min.node.size)) {
+    min.node.size <- .adaptive_min_node_size(n, p)
+  }
+
+  if (cross.fitting) {
+    result <- .fit_crossfitted(X, A, Y, num.trees, min.node.size, num.folds,
+                               augmented, mu.hat, scale.outcomes, solver,
+                               tol, ...)
+  } else {
+    result <- .fit_full_sample(X, A, Y, num.trees, min.node.size,
+                               augmented, mu.hat, scale.outcomes, solver,
+                               tol, ...)
+  }
+
+  out <- c(result, list(
+    X         = X,
+    A         = A,
+    Y         = Y,
+    n         = n,
+    n1        = as.integer(sum(A == 1)),
+    n0        = as.integer(sum(A == 0)),
+    crossfit  = cross.fitting,
+    augmented = augmented
+  ))
+  class(out) <- "forest_balance"
+  out
+}
+
+
+# ===========================================================================
+# Internal helpers
+# ===========================================================================
+
+#' Validate inputs to forest_balance
+#' @noRd
+.validate_inputs <- function(X, A, Y, mu.hat, cross.fitting, num.folds, n) {
   if (length(A) != n || length(Y) != n) {
     stop("X, A, and Y must have the same number of observations.")
   }
   if (!all(A %in% c(0, 1))) {
     stop("Treatment vector A must be binary (0/1).")
   }
-
-  # Adaptive min.node.size heuristic
-  if (is.null(min.node.size)) {
-    min.node.size <- max(20L, min(floor(n / 200) + p, floor(n / 50)))
+  if (!is.null(mu.hat)) {
+    if (!is.list(mu.hat) || is.null(mu.hat$mu1) || is.null(mu.hat$mu0)) {
+      stop("mu.hat must be a list with components 'mu1' and 'mu0'.")
+    }
+    if (length(mu.hat$mu1) != n || length(mu.hat$mu0) != n) {
+      stop("mu.hat$mu1 and mu.hat$mu0 must each have length n.")
+    }
+    if (cross.fitting) {
+      message("Note: user-supplied mu.hat used with cross.fitting = TRUE. ",
+              "Ensure predictions were cross-fitted externally.")
+    }
   }
+  if (cross.fitting && (num.folds < 2 || num.folds > n)) {
+    stop("num.folds must be between 2 and n.")
+  }
+}
 
-  if (cross.fitting) {
-    # ------------------------------------------------------------------
-    # Cross-fitting path
-    # ------------------------------------------------------------------
-    if (num.folds < 2 || num.folds > n) {
-      stop("num.folds must be between 2 and n.")
-    }
 
-    fold_ids  <- sample(rep(seq_len(num.folds), length.out = n))
-    fold_ates <- numeric(num.folds)
-    weights   <- numeric(n)
-    last_forest <- NULL
-    last_solver <- NULL
+#' Compute adaptive min.node.size
+#' @noRd
+.adaptive_min_node_size <- function(n, p) {
+  max(20L, min(floor(n / 200) + p, floor(n / 50)))
+}
 
-    for (k in seq_len(num.folds)) {
-      idx_k    <- which(fold_ids == k)
-      idx_notk <- which(fold_ids != k)
-      n_k <- length(idx_k)
 
-      A_test <- A[idx_k]; Y_test <- Y[idx_k]
+#' Choose solver based on sample size and kernel density
+#' @noRd
+.choose_solver <- function(solver, n_obs, min.node.size) {
+  if (solver != "auto") return(solver)
+  if (n_obs > 5000 || min.node.size > n_obs / 20) "cg" else "direct"
+}
 
-      # Skip if a treatment group is empty in this fold
-      if (sum(A_test == 1) == 0 || sum(A_test == 0) == 0) {
-        fold_ates[k] <- NA
-        next
-      }
 
-      # Train forest on held-out folds
-      response_train <- cbind(A[idx_notk], Y[idx_notk])
-      if (scale.outcomes) response_train <- scale(response_train)
+#' Train joint forest and compute balancing weights for a set of observations
+#' @return List with components: weights, forest, solver, kernel (or NULL)
+#' @noRd
+.fit_kernel_and_balance <- function(X_train, A_train, Y_train,
+                                    X_pred, A_pred,
+                                    num.trees, min.node.size,
+                                    scale.outcomes, solver, tol, ...) {
+  # Train joint forest
+  response <- cbind(A_train, Y_train)
+  if (scale.outcomes) response <- scale(response)
 
-      forest_k <- grf::multi_regression_forest(
-        X[idx_notk, , drop = FALSE], Y = response_train,
-        num.trees = num.trees, min.node.size = min.node.size, ...
-      )
+  forest <- grf::multi_regression_forest(
+    X_train, Y = response,
+    num.trees = num.trees, min.node.size = min.node.size, ...
+  )
 
-      # Predict leaf nodes for held-in fold
-      leaf_mat_k <- get_leaf_node_matrix(forest_k, newdata = X[idx_k, , drop = FALSE])
+  # Extract leaf nodes and build kernel / Z
+  leaf_mat <- get_leaf_node_matrix(forest, newdata = X_pred)
+  n_pred <- nrow(X_pred)
+  eff_solver <- .choose_solver(solver, n_pred, min.node.size)
 
-      # Build kernel / Z and solve.
-      # CG is preferred when the fold is large or the kernel would be dense
-      # (large min.node.size relative to fold size creates denser kernels).
-      use_cg <- (solver == "cg") ||
-                (solver == "auto" && (n_k > 5000 || min.node.size > n_k / 20))
-      if (use_cg) {
-        Z_k <- leaf_node_kernel_Z(leaf_mat_k)
-        bal_k <- kernel_balance(trt = A_test, Z = Z_k, num.trees = num.trees,
-                                solver = "cg", tol = tol)
-      } else {
-        K_k <- leaf_node_kernel(leaf_mat_k)
-        bal_k <- kernel_balance(trt = A_test, kern = K_k, solver = "direct")
-      }
-
-      w_k <- bal_k$weights
-      fold_ates[k] <- weighted.mean(Y_test[A_test == 1], w_k[A_test == 1]) -
-                       weighted.mean(Y_test[A_test == 0], w_k[A_test == 0])
-      weights[idx_k] <- w_k
-      last_forest <- forest_k
-      last_solver <- bal_k$solver
-    }
-
-    ate <- mean(fold_ates, na.rm = TRUE)
-
-    out <- list(
-      ate       = ate,
-      weights   = weights,
-      fold_ates = fold_ates,
-      fold_ids  = fold_ids,
-      kernel    = NULL,
-      forest    = last_forest,
-      X         = X,
-      A         = A,
-      Y         = Y,
-      n         = n,
-      n1        = as.integer(sum(A == 1)),
-      n0        = as.integer(sum(A == 0)),
-      solver    = last_solver,
-      crossfit  = TRUE,
-      num.folds = num.folds
-    )
-
+  if (eff_solver == "cg") {
+    Z <- leaf_node_kernel_Z(leaf_mat)
+    bal <- kernel_balance(trt = A_pred, Z = Z, num.trees = num.trees,
+                          solver = "cg", tol = tol)
+    K <- NULL
   } else {
-    # ------------------------------------------------------------------
-    # No cross-fitting path
-    # ------------------------------------------------------------------
-    response <- cbind(A, Y)
-    if (scale.outcomes) response <- scale(response)
-
-    forest <- grf::multi_regression_forest(
-      X, Y = response,
-      num.trees = num.trees, min.node.size = min.node.size, ...
-    )
-
-    leaf_mat <- get_leaf_node_matrix(forest, newdata = X)
-    use_cg <- (solver == "cg") ||
-              (solver == "auto" && (n > 5000 || min.node.size > n / 20))
-
-    if (use_cg) {
-      Z <- leaf_node_kernel_Z(leaf_mat)
-      bal <- kernel_balance(trt = A, Z = Z, num.trees = num.trees,
-                            solver = "cg", tol = tol)
-      K <- NULL
-    } else {
-      K <- leaf_node_kernel(leaf_mat)
-      bal <- kernel_balance(trt = A, kern = K, solver = "direct")
-    }
-    w <- bal$weights
-
-    ate <- weighted.mean(Y[A == 1], w[A == 1]) -
-           weighted.mean(Y[A == 0], w[A == 0])
-
-    out <- list(
-      ate       = ate,
-      weights   = w,
-      kernel    = K,
-      forest    = forest,
-      X         = X,
-      A         = A,
-      Y         = Y,
-      n         = n,
-      n1        = as.integer(sum(A == 1)),
-      n0        = as.integer(sum(A == 0)),
-      solver    = bal$solver,
-      crossfit  = FALSE
-    )
+    K <- leaf_node_kernel(leaf_mat)
+    bal <- kernel_balance(trt = A_pred, kern = K, solver = "direct")
+    Z <- NULL
   }
 
-  class(out) <- "forest_balance"
-  out
+  list(weights = bal$weights, forest = forest,
+       solver = bal$solver, kernel = K)
+}
+
+
+#' Fit group-specific outcome models and predict for target observations
+#' @return List with mu1 and mu0 prediction vectors
+#' @noRd
+.fit_outcome_models <- function(X_train, A_train, Y_train,
+                                X_pred, num.trees) {
+  idx_t <- which(A_train == 1)
+  idx_c <- which(A_train == 0)
+
+  mu1_forest <- grf::regression_forest(
+    X_train[idx_t, , drop = FALSE], Y_train[idx_t], num.trees = num.trees
+  )
+  mu0_forest <- grf::regression_forest(
+    X_train[idx_c, , drop = FALSE], Y_train[idx_c], num.trees = num.trees
+  )
+
+  list(
+    mu1 = predict(mu1_forest, newdata = X_pred)$predictions,
+    mu0 = predict(mu0_forest, newdata = X_pred)$predictions
+  )
+}
+
+
+#' Compute ATE from weights, outcomes, and optional outcome model predictions
+#' @noRd
+.compute_ate <- function(Y, A, w, augmented, mu1 = NULL, mu0 = NULL) {
+  if (augmented) {
+    # Doubly-robust: regression term + weighted bias correction
+    reg_term <- mean(mu1 - mu0)
+    corr_1 <- weighted.mean(Y[A == 1] - mu1[A == 1], w[A == 1])
+    corr_0 <- weighted.mean(Y[A == 0] - mu0[A == 0], w[A == 0])
+    reg_term + corr_1 - corr_0
+  } else {
+    # Hajek weighted estimator
+    weighted.mean(Y[A == 1], w[A == 1]) -
+      weighted.mean(Y[A == 0], w[A == 0])
+  }
+}
+
+
+#' Cross-fitted estimation path
+#' @noRd
+.fit_crossfitted <- function(X, A, Y, num.trees, min.node.size, num.folds,
+                             augmented, mu.hat, scale.outcomes, solver,
+                             tol, ...) {
+  n <- nrow(X)
+  fold_ids  <- sample(rep(seq_len(num.folds), length.out = n))
+  fold_ates <- numeric(num.folds)
+  weights   <- numeric(n)
+  mu1_hat   <- if (augmented) numeric(n) else NULL
+  mu0_hat   <- if (augmented) numeric(n) else NULL
+  last_forest <- NULL
+  last_solver <- NULL
+
+  for (k in seq_len(num.folds)) {
+    idx_k    <- which(fold_ids == k)
+    idx_notk <- which(fold_ids != k)
+
+    A_k <- A[idx_k]; Y_k <- Y[idx_k]
+
+    # Skip if a treatment group is empty in this fold
+    if (sum(A_k == 1) == 0 || sum(A_k == 0) == 0) {
+      fold_ates[k] <- NA
+      next
+    }
+
+    # Fit kernel and compute weights
+    kb <- .fit_kernel_and_balance(
+      X_train = X[idx_notk, , drop = FALSE],
+      A_train = A[idx_notk], Y_train = Y[idx_notk],
+      X_pred = X[idx_k, , drop = FALSE], A_pred = A_k,
+      num.trees = num.trees, min.node.size = min.node.size,
+      scale.outcomes = scale.outcomes, solver = solver, tol = tol, ...
+    )
+    weights[idx_k] <- kb$weights
+    last_forest <- kb$forest
+    last_solver <- kb$solver
+
+    # Outcome model predictions for augmentation
+    if (augmented) {
+      if (is.null(mu.hat)) {
+        mu_k <- .fit_outcome_models(
+          X_train = X[idx_notk, , drop = FALSE],
+          A_train = A[idx_notk], Y_train = Y[idx_notk],
+          X_pred = X[idx_k, , drop = FALSE], num.trees = num.trees
+        )
+      } else {
+        mu_k <- list(mu1 = mu.hat$mu1[idx_k], mu0 = mu.hat$mu0[idx_k])
+      }
+      mu1_hat[idx_k] <- mu_k$mu1
+      mu0_hat[idx_k] <- mu_k$mu0
+    }
+
+    fold_ates[k] <- .compute_ate(Y_k, A_k, kb$weights, augmented,
+                                 mu1_hat[idx_k], mu0_hat[idx_k])
+  }
+
+  # Assign user-supplied mu.hat if provided (overwrite the initialized vectors)
+  if (augmented && !is.null(mu.hat)) {
+    mu1_hat <- mu.hat$mu1
+    mu0_hat <- mu.hat$mu0
+  }
+
+  list(
+    ate       = mean(fold_ates, na.rm = TRUE),
+    weights   = weights,
+    mu1.hat   = mu1_hat,
+    mu0.hat   = mu0_hat,
+    fold_ates = fold_ates,
+    fold_ids  = fold_ids,
+    kernel    = NULL,
+    forest    = last_forest,
+    solver    = last_solver,
+    num.folds = num.folds
+  )
+}
+
+
+#' Full-sample (no cross-fitting) estimation path
+#' @noRd
+.fit_full_sample <- function(X, A, Y, num.trees, min.node.size,
+                             augmented, mu.hat, scale.outcomes, solver,
+                             tol, ...) {
+  n <- nrow(X)
+
+  # Fit kernel and compute weights
+  kb <- .fit_kernel_and_balance(
+    X_train = X, A_train = A, Y_train = Y,
+    X_pred = X, A_pred = A,
+    num.trees = num.trees, min.node.size = min.node.size,
+    scale.outcomes = scale.outcomes, solver = solver, tol = tol, ...
+  )
+
+  # Outcome model predictions for augmentation
+  mu1_hat <- NULL; mu0_hat <- NULL
+  if (augmented) {
+    if (is.null(mu.hat)) {
+      mu_preds <- .fit_outcome_models(X, A, Y, X, num.trees)
+      mu1_hat <- mu_preds$mu1
+      mu0_hat <- mu_preds$mu0
+    } else {
+      mu1_hat <- mu.hat$mu1
+      mu0_hat <- mu.hat$mu0
+    }
+  }
+
+  ate <- .compute_ate(Y, A, kb$weights, augmented, mu1_hat, mu0_hat)
+
+  list(
+    ate     = ate,
+    weights = kb$weights,
+    mu1.hat = mu1_hat,
+    mu0.hat = mu0_hat,
+    kernel  = kb$kernel,
+    forest  = kb$forest,
+    solver  = kb$solver
+  )
 }

@@ -4,12 +4,13 @@
 \alias{simulate_data}
 \title{Simulate observational study data with confounding}
 \usage{
-simulate_data(n = 500, p = 10, ate = 0, rho = -0.25, sigma = 1)
+simulate_data(n = 500, p = 10, ate = 0, rho = -0.25, sigma = 1, dgp = 1)
 }
 \arguments{
 \item{n}{Sample size. Default is 500.}
 
-\item{p}{Number of covariates. Must be at least 5. Default is 10.}
+\item{p}{Number of covariates. Must be at least 5 for \code{dgp = 1} and at
+least 8 for \code{dgp = 2}. Default is 10.}
 
 \item{ate}{True average treatment effect. Default is 0.}
 
@@ -17,6 +18,9 @@ simulate_data(n = 500, p = 10, ate = 0, rho = -0.25, sigma = 1)
 covariates: \eqn{\Sigma_{jk} = \rho^{|j-k|}}. Default is \eqn{-0.25}.}
 
 \item{sigma}{Noise standard deviation for the outcome. Default is 1.}
+
+\item{dgp}{Integer selecting the data generating process. Default is 1.
+See Details.}
 }
 \value{
 A list with the following elements:
@@ -28,6 +32,7 @@ A list with the following elements:
 \item{ate}{The true ATE used in the simulation.}
 \item{n}{Sample size.}
 \item{p}{Number of covariates.}
+\item{dgp}{The DGP that was used.}
 }
 }
 \description{
@@ -37,27 +42,32 @@ functions. The true average treatment effect is known, allowing evaluation of
 estimator performance.
 }
 \details{
-The data generating process is:
-
-\strong{Covariates:} \eqn{X \sim N(0, \Sigma)} where
+Both DGPs generate covariates from \eqn{X \sim N(0, \Sigma)} where
 \eqn{\Sigma_{jk} = \rho^{|j-k|}}.
 
-\strong{Propensity score:} \eqn{P(A = 1 \mid X) = 0.25(1 + B(X_1; 2, 4))}, where
-\eqn{B(\cdot; 2, 4)} is the Beta(2,4) density. This creates a nonlinear
-relationship between \eqn{X_1} and treatment assignment.
+\strong{DGP 1} (default): Confounding through \eqn{X_1} via a Beta density.
 
-\strong{Outcome model:}
-\deqn{Y = 2(X_1 - 1) + 2\,B(X_1; 2, 4) + X_2 + 2\,B(X_5; 2, 4)
-        + \tau \cdot A + \varepsilon,}
-where \eqn{\varepsilon \sim N(0, \sigma^2)} and \eqn{\tau} is the ATE.
-Confounding arises because \eqn{X_1} affects both the propensity score and
-the outcome nonlinearly.
+\itemize{
+\item Propensity: \eqn{P(A=1|X) = 0.25(1 + B(X_1; 2, 4))} where
+\eqn{B} is the Beta(2,4) density.
+\item Outcome: \eqn{Y = 2(X_1-1) + 2 B(X_1;2,4) + X_2 + 2 B(X_5;2,4)
+    + \tau A + \varepsilon}.
+}
+
+\strong{DGP 2}: Rich outcome surface with moderate confounding. Designed to
+illustrate the benefit of the augmented estimator. Confounding operates
+through \eqn{X_1} and \eqn{X_2}, while the outcome depends on
+\eqn{X_1, \ldots, X_8} with interactions and nonlinearities.
+
+\itemize{
+\item Propensity: \eqn{P(A=1|X) = \mathrm{logit}^{-1}(0.6 X_1 - 0.4 X_2
+    + 0.2 X_1 X_2)}.
+\item Outcome: \eqn{Y = 2 X_1 + X_2^2 - 1.5 X_3 + \sin(2 X_4) +
+    X_5 X_1 + 0.8 X_6 - \cos(X_7) + 0.5 X_8 + \tau A + \varepsilon}.
+}
 }
 \examples{
-dat <- simulate_data(n = 500, p = 10, ate = 0)
-str(dat)
-
-# True ATE is 0, naive estimate is biased
-mean(dat$Y[dat$A == 1]) - mean(dat$Y[dat$A == 0])
+dat1 <- simulate_data(n = 500, p = 10, dgp = 1)
+dat2 <- simulate_data(n = 500, p = 20, dgp = 2)
 
 }
