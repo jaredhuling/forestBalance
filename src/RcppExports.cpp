@@ -22,6 +22,17 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// build_Z_cpp
+List build_Z_cpp(IntegerMatrix leaf_matrix);
+RcppExport SEXP _forestBalance_build_Z_cpp(SEXP leaf_matrixSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< IntegerMatrix >::type leaf_matrix(leaf_matrixSEXP);
+    rcpp_result_gen = Rcpp::wrap(build_Z_cpp(leaf_matrix));
+    return rcpp_result_gen;
+END_RCPP
+}
 // remap_leaves_cpp
 IntegerMatrix remap_leaves_cpp(IntegerMatrix leaf_matrix);
 RcppExport SEXP _forestBalance_remap_leaves_cpp(SEXP leaf_matrixSEXP) {
@@ -36,6 +47,7 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_forestBalance_get_leaf_nodes_cpp", (DL_FUNC) &_forestBalance_get_leaf_nodes_cpp, 2},
+    {"_forestBalance_build_Z_cpp", (DL_FUNC) &_forestBalance_build_Z_cpp, 1},
     {"_forestBalance_remap_leaves_cpp", (DL_FUNC) &_forestBalance_remap_leaves_cpp, 1},
     {NULL, NULL, 0}
 };

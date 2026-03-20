@@ -23,6 +23,7 @@ Imports:
     grf (>= 2.3.0),
     MASS,
     Matrix,
+    methods,
     Rcpp
 Suggests:
     ggplot2,

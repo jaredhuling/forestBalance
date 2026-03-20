@@ -40,25 +40,13 @@
 #' }
 #'
 #' @importFrom Matrix sparseMatrix tcrossprod
+#' @importFrom methods new
 #' @export
 leaf_node_kernel <- function(leaf_matrix, sparse = TRUE) {
-  n <- nrow(leaf_matrix)
   B <- ncol(leaf_matrix)
 
-  # Remap leaf IDs to consecutive integers with per-tree offsets (C++)
-  remapped <- remap_leaves_cpp(leaf_matrix)
-  total_cols <- max(remapped)
-
-  # Build sparse indicator matrix Z: n rows, total_cols columns, n*B nonzeros
-  row_idx <- rep(seq_len(n), times = B)
-  col_idx <- as.integer(remapped)
-
-  Z <- Matrix::sparseMatrix(
-    i = row_idx,
-    j = col_idx,
-    x = 1,
-    dims = c(n, total_cols)
-  )
+  # Build Z via C++ (remap + CSC construction in one step)
+  Z <- leaf_node_kernel_Z(leaf_matrix)
 
   # Single sparse tcrossprod: K = Z Z^T / B
   K <- Matrix::tcrossprod(Z) / B
@@ -98,16 +86,10 @@ leaf_node_kernel <- function(leaf_matrix, sparse = TRUE) {
 #'
 #' @export
 leaf_node_kernel_Z <- function(leaf_matrix) {
-  n <- nrow(leaf_matrix)
-  B <- ncol(leaf_matrix)
-
-  remapped <- remap_leaves_cpp(leaf_matrix)
-  total_cols <- max(remapped)
-
-  Matrix::sparseMatrix(
-    i = rep(seq_len(n), times = B),
-    j = as.integer(remapped),
-    x = 1,
-    dims = c(n, total_cols)
-  )
+  csc <- build_Z_cpp(leaf_matrix)
+  new("dgCMatrix",
+      i = csc$i,
+      p = csc$p,
+      x = csc$x,
+      Dim = c(csc$nrow, csc$ncol))
 }

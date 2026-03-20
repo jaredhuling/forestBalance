@@ -5,6 +5,10 @@ get_leaf_nodes_cpp <- function(forest, newdata) {
     .Call(`_forestBalance_get_leaf_nodes_cpp`, forest, newdata)
 }
 
+build_Z_cpp <- function(leaf_matrix) {
+    .Call(`_forestBalance_build_Z_cpp`, leaf_matrix)
+}
+
 remap_leaves_cpp <- function(leaf_matrix) {
     .Call(`_forestBalance_remap_leaves_cpp`, leaf_matrix)
 }
