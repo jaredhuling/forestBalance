@@ -9,7 +9,9 @@ forest_balance(
   A,
   Y,
   num.trees = 1000,
-  min.node.size = 10,
+  min.node.size = NULL,
+  cross.fitting = TRUE,
+  num.folds = 2,
   scale.outcomes = TRUE,
   solver = c("auto", "direct", "cg"),
   tol = 5e-11,
@@ -25,16 +27,27 @@ forest_balance(
 
 \item{num.trees}{Number of trees to grow in the forest. Default is 1000.}
 
-\item{min.node.size}{Minimum number of observations per leaf node. Default
-is 10.}
+\item{min.node.size}{Minimum number of observations per leaf node. If
+\code{NULL} (default), an adaptive heuristic is used:
+\code{max(20, min(floor(n/200) + p, floor(n/50)))}. This scales the leaf
+size with both the sample size and the number of covariates, which
+empirically yields low bias. See Details.}
+
+\item{cross.fitting}{Logical; if \code{TRUE} (default), use K-fold
+cross-fitting to construct the kernel from held-out data, reducing
+overfitting bias. If \code{FALSE}, the kernel is estimated on the full
+sample.}
+
+\item{num.folds}{Number of cross-fitting folds. Default is 2. Only used when
+\code{cross.fitting = TRUE}.}
 
 \item{scale.outcomes}{If \code{TRUE} (default), the joint outcome matrix
 \code{cbind(A, Y)} is column-standardized before fitting the forest. This
 ensures that treatment and outcome contribute equally to the splits.}
 
 \item{solver}{Which linear solver to use for the balancing weights.
-\code{"auto"} (default) selects \code{"direct"} for \eqn{n \le 5000}
-and \code{"cg"} for \eqn{n > 5000}. See \code{\link{kernel_balance}} for
+\code{"auto"} (default) selects \code{"direct"} for small fold sizes
+and \code{"cg"} for large fold sizes. See \code{\link{kernel_balance}} for
 details.}
 
 \item{tol}{Convergence tolerance for the CG solver. Default is \code{5e-11}.}
@@ -46,15 +59,21 @@ details.}
 An object of class \code{"forest_balance"} (a list) with the
 following elements:
 \describe{
-\item{ate}{The estimated average treatment effect (Hajek estimator).}
-\item{weights}{The balancing weights from \code{\link{kernel_balance}}.}
+\item{ate}{The estimated average treatment effect. When cross-fitting is
+used, this is the average of per-fold Hajek estimates (DML1).}
+\item{weights}{The balancing weight vector (length \eqn{n}). When
+cross-fitting is used, these are the concatenated per-fold weights.}
 \item{kernel}{The \eqn{n \times n} forest proximity kernel (sparse matrix),
-or \code{NULL} when the CG solver is used (since the kernel is never
-formed).}
-\item{forest}{The trained \code{\link[grf]{multi_regression_forest}} object.}
-\item{X, A, Y}{The input data (stored for use by \code{\link{summary.forest_balance}}).}
+or \code{NULL} when cross-fitting or the CG solver is used.}
+\item{forest}{The trained forest object. When cross-fitting is used, this
+is the last fold's forest.}
+\item{X, A, Y}{The input data.}
 \item{n, n1, n0}{Total, treated, and control sample sizes.}
 \item{solver}{The solver that was used (\code{"direct"} or \code{"cg"}).}
+\item{crossfit}{Logical indicating whether cross-fitting was used.}
+\item{num.folds}{Number of folds (if cross-fitting was used).}
+\item{fold_ates}{Per-fold ATE estimates (if cross-fitting was used).}
+\item{fold_ids}{Fold assignments (if cross-fitting was used).}
 }
 The object has \code{print} and \code{summary} methods. Use
 \code{\link{summary.forest_balance}} for covariate balance diagnostics.
@@ -63,7 +82,9 @@ The object has \code{print} and \code{summary} methods. Use
 Fits a multivariate random forest that jointly models the relationship
 between covariates, treatment, and outcome, computes a random forest
 proximity kernel, and then uses kernel energy balancing to produce weights
-for estimating the average treatment effect (ATE).
+for estimating the average treatment effect (ATE). By default, K-fold
+cross-fitting is used to avoid overfitting bias from estimating the kernel
+on the same data used for treatment effect estimation.
 }
 \details{
 The method proceeds in three steps:
@@ -80,11 +101,17 @@ closed-form kernel energy distance solution. The ATE is then estimated
 using the Hajek (ratio) estimator with these weights.
 }
 
-For \eqn{n \le 5000} (or when \code{solver = "direct"}), the kernel matrix
-is formed explicitly and the balancing system is solved via sparse Cholesky.
-For \eqn{n > 5000} (or when \code{solver = "cg"}), the kernel is never
-formed; instead, a conjugate gradient solver operates on the factored
-representation \eqn{K = Z Z^\top / B}, saving both time and memory.
+\strong{Cross-fitting} (default): For each fold \eqn{k}, the forest is
+trained on all data \emph{except} fold \eqn{k}, and the kernel for fold
+\eqn{k} is built from that held-out forest's leaf predictions. This breaks
+the dependence between the kernel and the outcomes, reducing overfitting
+bias. The final ATE is the average of the per-fold Hajek estimates (DML1).
+
+\strong{Adaptive leaf size}: The default \code{min.node.size} is set
+adaptively via \code{max(20, min(floor(n/200) + p, floor(n/50)))}. Larger
+leaves produce smoother kernels that generalize better, while the cap at
+\code{n/50} prevents kernel degeneracy. This heuristic was calibrated
+empirically to minimize RMSE across a range of sample sizes and dimensions.
 }
 \examples{
 \donttest{
@@ -94,12 +121,21 @@ X <- matrix(rnorm(n * p), n, p)
 A <- rbinom(n, 1, plogis(0.5 * X[, 1]))
 Y <- X[, 1] + rnorm(n)  # true ATE = 0
 
+# Default: cross-fitting with adaptive leaf size
 result <- forest_balance(X, A, Y)
-result$ate
+result
+
+# Without cross-fitting
+result_nocf <- forest_balance(X, A, Y, cross.fitting = FALSE)
 }
 
 }
 \references{
+Chernozhukov, V., Chetverikov, D., Demirer, M., Duflo, E., Hansen, C.,
+Newey, W. and Robins, J. (2018). Double/debiased machine learning for
+treatment and structural parameters. \emph{The Econometrics Journal},
+21(1), C1--C68.
+
 De, S. and Huling, J.D. (2025). Data adaptive covariate balancing for causal
 effect estimation for high dimensional data.
 \emph{arXiv preprint arXiv:2512.18069}.

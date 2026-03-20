@@ -84,8 +84,9 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, num.trees = NULL,
                            tol = 5e-11, maxiter = 1000L) {
   solver <- match.arg(solver)
 
+  trt <- as.double(trt)
   n  <- length(trt)
-  n1 <- sum(trt == 1)
+  n1 <- sum(trt)
   n0 <- n - n1
 
   if (n1 == 0 || n0 == 0) {

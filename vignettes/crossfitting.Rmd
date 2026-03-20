@@ -1,0 +1,234 @@
+---
+title: "Cross-Fitting for Debiased Kernel Estimation"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Cross-Fitting for Debiased Kernel Estimation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, message = FALSE, warning = FALSE,
+  fig.width = 6.5, fig.height = 4, collapse = TRUE, comment = "#>"
+)
+```
+
+## The overfitting problem
+
+The forest balance estimator uses the data twice: once to fit the random forest
+that defines the kernel, and again to estimate the treatment effect using that
+kernel.  This creates a subtle **overfitting bias** that persists even at large
+sample sizes.
+
+To see this, we compare the standard (no cross-fitting) estimator with small
+leaf size against the cross-fitted estimator with adaptive leaf size and an
+oracle that uses the true propensity scores.  We use $n = 10{,}000$ and
+$p = 50$ covariates, where the bias is most pronounced:
+
+```{r overfitting-demo, cache=TRUE}
+library(forestBalance)
+
+set.seed(123)
+nreps <- 5
+
+res <- matrix(NA, nreps, 3,
+              dimnames = list(NULL, c("No CF (mns=10)", "CF (default)", "Oracle IPW")))
+
+for (r in seq_len(nreps)) {
+  dat <- simulate_data(n = 10000, p = 50, ate = 0)
+
+  # Standard: no cross-fitting, small min.node.size
+  fit_nocf <- forest_balance(dat$X, dat$A, dat$Y,
+                              cross.fitting = FALSE, min.node.size = 10,
+                              num.trees = 500)
+  res[r, "No CF (mns=10)"] <- fit_nocf$ate
+
+  # Cross-fitted with adaptive leaf size (package default)
+  fit_cf <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 500)
+  res[r, "CF (default)"] <- fit_cf$ate
+
+  # Oracle IPW (true propensity scores)
+  ps <- dat$propensity
+  w_ipw <- ifelse(dat$A == 1, 1 / ps, 1 / (1 - ps))
+  res[r, "Oracle IPW"] <- weighted.mean(dat$Y[dat$A == 1], w_ipw[dat$A == 1]) -
+                           weighted.mean(dat$Y[dat$A == 0], w_ipw[dat$A == 0])
+}
+```
+
+```{r overfitting-table, echo=FALSE}
+stbl <- data.frame(
+  Method = colnames(res),
+  Bias = round(colMeans(res), 4),
+  SD = round(apply(res, 2, sd), 4),
+  RMSE = round(sqrt(colMeans(res)^2 + apply(res, 2, var)), 4)
+)
+knitr::kable(stbl, row.names = FALSE,
+             caption = "n = 10,000, p = 50, true ATE = 0, 5 replications.")
+```
+
+The no-cross-fitting estimator with small leaves has substantial bias.  The
+default cross-fitted estimator with adaptive leaf size achieves much lower bias
+and RMSE.
+
+## Cross-fitting details
+
+The idea follows the **double/debiased machine learning** (DML) framework of
+Chernozhukov et al. (2018), adapted to kernel energy balancing.
+
+
+Let $K$ denote the $n \times n$ proximity kernel built from a random forest
+trained on the full sample $(X, A, Y)$.  The kernel captures which observations
+are "similar" in terms of confounding structure.  However, because $K$ was
+estimated from the same data used to compute the ATE, the kernel overfits:
+it encodes information about the specific realisation of outcomes, not just
+the confounding structure.  This creates a bias that does not vanish as
+$n \to \infty$.
+
+### K-fold cross-fitting
+
+Given $K$ folds, the cross-fitted estimator proceeds as follows:
+
+1. **Randomly partition** the data into $K$ roughly equal folds
+   $F_1, \ldots, F_K$.
+
+2. **For each fold** $k = 1, \ldots, K$:
+
+   a. Train a `multi_regression_forest` on the data in folds $F_{-k}$ (all
+      folds except $k$).
+   b. Using this held-out forest, predict leaf node memberships for the
+      observations in fold $F_k$.
+   c. Build the proximity kernel $K_k$ ($n_k \times n_k$) from these
+      out-of-sample leaf predictions.
+   d. Compute kernel energy balancing weights $w_k$ for the observations in
+      fold $F_k$ using $K_k$.
+   e. Estimate the fold-level ATE via the Hajek estimator:
+      $$\hat\tau_k = \frac{\sum_{i \in F_k} w_i A_i Y_i}
+        {\sum_{i \in F_k} w_i A_i}
+        - \frac{\sum_{i \in F_k} w_i (1-A_i) Y_i}
+        {\sum_{i \in F_k} w_i (1-A_i)}.$$
+
+3. **Average** the fold-level estimates (DML1):
+   $$\hat\tau_{\mathrm{CF}} = \frac{1}{K} \sum_{k=1}^{K} \hat\tau_k.$$
+
+
+
+
+
+## The role of leaf size
+
+Cross-fitting alone is not sufficient to eliminate bias.  The **minimum leaf
+size** (`min.node.size`) plays a crucial role:
+
+- **Small leaves** (e.g., `min.node.size = 5`): the kernel is very granular,
+  distinguishing observations at a fine scale.  But with out-of-sample
+  predictions, small leaves lead to noisy similarity estimates---two
+  observations may share a tiny leaf by chance rather than true similarity.
+
+- **Large leaves** (e.g., `min.node.size = 50--100`): the kernel captures
+  broader confounding structure.  Out-of-sample predictions are more stable
+  because large leaves better represent population-level similarity.
+
+The optimal leaf size scales with both $n$ (more data supports finer leaves)
+and $p$ (more covariates require coarser leaves to avoid the curse of
+dimensionality).  `forestBalance` uses an adaptive heuristic:
+
+$$\mathrm{min.node.size} = \max\!\Big(20,\;\min\!\big(\lfloor n/200 \rfloor + p,\;\lfloor n/50 \rfloor\big)\Big).$$
+
+```{r leaf-size, cache=TRUE}
+set.seed(123)
+nreps <- 5
+node_sizes <- c(5, 10, 20, 50, 75, 100)
+n <- 10000; p <- 50
+
+leaf_res <- do.call(rbind, lapply(node_sizes, function(mns) {
+  ates <- replicate(nreps, {
+    dat <- simulate_data(n = n, p = p, ate = 0)
+    forest_balance(dat$X, dat$A, dat$Y, num.trees = 500,
+                   min.node.size = mns)$ate
+  })
+  data.frame(mns = mns, bias = mean(ates), sd = sd(ates),
+             rmse = sqrt(mean(ates)^2 + var(ates)))
+}))
+
+heuristic <- max(20, min(floor(n / 200) + p, floor(n / 50)))
+```
+
+```{r leaf-size-table, echo=FALSE}
+leaf_res$bias <- round(leaf_res$bias, 4)
+leaf_res$sd <- round(leaf_res$sd, 4)
+leaf_res$rmse <- round(leaf_res$rmse, 4)
+leaf_res$default <- ifelse(leaf_res$mns == heuristic, "<--", "")
+names(leaf_res) <- c("min.node.size", "Bias", "SD", "RMSE", "")
+knitr::kable(leaf_res, row.names = FALSE, align = "rrrrl",
+             caption = sprintf("Cross-fitted estimator (n = %s, p = %d, 10 reps). Arrow marks the adaptive default (mns = %d).",
+                               format(n, big.mark = ","), p, heuristic))
+```
+
+Bias decreases with larger leaves until variance begins to dominate.  The
+adaptive default balances bias reduction against variance.
+
+## Practical usage
+
+The default call uses cross-fitting with the adaptive leaf size:
+
+```{r usage}
+dat <- simulate_data(n = 2000, p = 10, ate = 0)
+fit <- forest_balance(dat$X, dat$A, dat$Y)
+fit
+```
+
+To disable cross-fitting (e.g., for speed or to inspect the kernel):
+
+```{r no-crossfit}
+fit_nocf <- forest_balance(dat$X, dat$A, dat$Y, cross.fitting = FALSE)
+fit_nocf
+```
+
+To manually set the leaf size:
+
+```{r manual-mns}
+fit_custom <- forest_balance(dat$X, dat$A, dat$Y, min.node.size = 50)
+fit_custom
+```
+
+## Choosing the number of folds
+
+The default is `num.folds = 2` (sample splitting).  With two folds, each fold
+retains half the observations, producing high-quality per-fold kernels.  More
+folds train the forest on more data but produce smaller per-fold kernels.  Our
+experiments show that the number of folds has a modest effect compared to the
+leaf size.  Values of 2--5 all work well:
+
+```{r folds, cache=TRUE}
+set.seed(123)
+nreps <- 5
+n <- 5000
+
+fold_res <- do.call(rbind, lapply(c(2, 3, 5, 10), function(nfolds) {
+  ates <- replicate(nreps, {
+    dat <- simulate_data(n = n, p = 10, ate = 0)
+    forest_balance(dat$X, dat$A, dat$Y, num.trees = 500,
+                   num.folds = nfolds)$ate
+  })
+  data.frame(folds = nfolds, bias = round(mean(ates), 4),
+             sd = round(sd(ates), 4),
+             rmse = round(sqrt(mean(ates)^2 + var(ates)), 4))
+}))
+```
+
+```{r folds-table, echo=FALSE}
+names(fold_res) <- c("Folds", "Bias", "SD", "RMSE")
+knitr::kable(fold_res, row.names = FALSE, align = "rrrr",
+             caption = "Effect of number of folds (n = 5,000, adaptive leaf size).")
+```
+
+## References
+
+Chernozhukov, V., Chetverikov, D., Demirer, M., Duflo, E., Hansen, C.,
+Newey, W. and Robins, J. (2018). Double/debiased machine learning for
+treatment and structural parameters. *The Econometrics Journal*, 21(1),
+C1--C68.
+
+De, S. and Huling, J.D. (2025). Data adaptive covariate balancing for causal
+effect estimation for high dimensional data. *arXiv preprint arXiv:2512.18069*.

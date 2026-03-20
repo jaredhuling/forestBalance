@@ -24,7 +24,8 @@ estimator performance."></head><body>
       <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/guide.html">Getting Started with forestBalance</a></li>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/crossfitting.html">Cross-Fitting for Debiased Kernel Estimation</a></li>
+    <li><a class="dropdown-item" href="../articles/guide.html">Getting Started with forestBalance</a></li>
     <li><a class="dropdown-item" href="../articles/performance.html">Performance and Scalability</a></li>
   </ul></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -125,20 +126,20 @@ the outcome nonlinearly.</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu">simulate_data</span><span class="op">(</span>n <span class="op">=</span> <span class="fl">500</span>, p <span class="op">=</span> <span class="fl">10</span>, ate <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">dat</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> List of 7</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ X         : num [1:500, 1:10] -1.134 -1.973 -0.461 -0.219 -0.25 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ X         : num [1:500, 1:10] -1.17 -1.51 2.69 0.23 -0.17 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..$ : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..$ : chr [1:10] "X1" "X2" "X3" "X4" ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ A         : int [1:500] 1 0 0 0 0 1 1 1 1 1 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ Y         : num [1:500] -4.181 -8.72 -6.27 -0.833 -3.603 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ propensity: num [1:500] 0.25 0.25 0.25 0.25 0.25 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ A         : int [1:500] 0 0 0 1 0 0 1 0 0 0 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ Y         : num [1:500] -4.703 -5.379 -0.876 1.799 2.629 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ propensity: num [1:500] 0.25 0.25 0.25 0.775 0.25 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ ate       : num 0</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ n         : num 500</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ p         : num 10</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># True ATE is 0, naive estimate is biased</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">Y</span><span class="op">[</span><span class="va">dat</span><span class="op">$</span><span class="va">A</span> <span class="op">==</span> <span class="fl">1</span><span class="op">]</span><span class="op">)</span> <span class="op">-</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">Y</span><span class="op">[</span><span class="va">dat</span><span class="op">$</span><span class="va">A</span> <span class="op">==</span> <span class="fl">0</span><span class="op">]</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 1.102824</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.8173965</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

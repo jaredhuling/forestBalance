@@ -14,16 +14,29 @@ print.forest_balance <- function(x, ...) {
   n1 <- x$n1
   n0 <- x$n0
   w  <- x$weights
+  is_cf <- isTRUE(x$crossfit)
 
-  cat("Forest Kernel Energy Balancing\n")
+  if (is_cf) {
+    cat("Forest Kernel Energy Balancing (cross-fitted)\n")
+  } else {
+    cat("Forest Kernel Energy Balancing\n")
+  }
   cat(strrep("-", 50), "\n")
   cat(sprintf("  n = %s  (n_treated = %d, n_control = %d)\n",
               format(n, big.mark = ","), n1, n0))
   cat(sprintf("  Trees: %d\n", x$forest[["_num_trees"]]))
+  if (is_cf) {
+    cat(sprintf("  Cross-fitting: %d folds\n", x$num.folds))
+  }
   cat(sprintf("  Solver: %s\n", x$solver))
   cat(sprintf("  ATE estimate: %.4f\n", x$ate))
 
-  # ESS
+  if (is_cf) {
+    cat(sprintf("  Fold ATEs: %s\n",
+                paste(round(x$fold_ates, 4), collapse = ", ")))
+  }
+
+  # ESS (pooled across folds for cross-fitted)
   idx_t <- which(x$A == 1)
   idx_c <- which(x$A == 0)
   ess_t <- (sum(w[idx_t]))^2 / sum(w[idx_t]^2)
