@@ -1,0 +1,16 @@
+The performance vignette is precompiled because it runs benchmarks up to
+n = 50,000 which takes several minutes.
+
+To refresh it after code changes:
+
+  Rscript vignettes/precompile.R
+
+This knits performance.Rmd.orig into performance.Rmd (with embedded output)
+and regenerates the performance-*.png figures.
+
+The other vignettes (guide, crossfitting, augmented) are standard Rmd files
+that R CMD build compiles directly.
+
+To rebuild the pkgdown website:
+
+  Rscript -e 'pkgdown::build_site()'
