@@ -17,6 +17,7 @@ forest_balance(
   scale.outcomes = TRUE,
   solver = c("auto", "direct", "cg"),
   tol = 5e-11,
+  parallel = FALSE,
   ...
 )
 }
@@ -69,6 +70,13 @@ and \code{"cg"} for large fold sizes. See \code{\link{kernel_balance}} for
 details.}
 
 \item{tol}{Convergence tolerance for the CG solver. Default is \code{5e-11}.}
+
+\item{parallel}{Logical or integer. If \code{FALSE} (default), folds are
+processed sequentially. If \code{TRUE}, folds are processed in parallel
+using all available cores via \code{\link[parallel]{mclapply}}. An integer
+value specifies the exact number of cores. Only used when
+\code{cross.fitting = TRUE}. Note: parallel processing is not supported on
+Windows.}
 
 \item{...}{Additional arguments passed to
 \code{\link[grf]{multi_regression_forest}}.}

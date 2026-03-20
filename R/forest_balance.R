@@ -44,6 +44,12 @@
 #'   and \code{"cg"} for large fold sizes. See \code{\link{kernel_balance}} for
 #'   details.
 #' @param tol Convergence tolerance for the CG solver. Default is \code{5e-11}.
+#' @param parallel Logical or integer. If \code{FALSE} (default), folds are
+#'   processed sequentially. If \code{TRUE}, folds are processed in parallel
+#'   using all available cores via \code{\link[parallel]{mclapply}}. An integer
+#'   value specifies the exact number of cores. Only used when
+#'   \code{cross.fitting = TRUE}. Note: parallel processing is not supported on
+#'   Windows.
 #' @param ... Additional arguments passed to
 #'   \code{\link[grf]{multi_regression_forest}}.
 #'
@@ -155,6 +161,7 @@ forest_balance <- function(X, A, Y,
                            scale.outcomes = TRUE,
                            solver = c("auto", "direct", "cg"),
                            tol = 5e-11,
+                           parallel = FALSE,
                            ...) {
   solver <- match.arg(solver)
   X <- as.matrix(X)
@@ -171,7 +178,7 @@ forest_balance <- function(X, A, Y,
   if (cross.fitting) {
     result <- .fit_crossfitted(X, A, Y, num.trees, min.node.size, num.folds,
                                augmented, mu.hat, scale.outcomes, solver,
-                               tol, ...)
+                               tol, parallel, ...)
   } else {
     result <- .fit_full_sample(X, A, Y, num.trees, min.node.size,
                                augmented, mu.hat, scale.outcomes, solver,
@@ -315,13 +322,92 @@ forest_balance <- function(X, A, Y,
 }
 
 
+#' Process a single cross-fitting fold
+#' @return List with fold-level results (ate, weights, mu1, mu0, etc.)
+#' @noRd
+.fit_one_fold <- function(k, fold_ids, X, A, Y, num.trees, min.node.size,
+                          augmented, mu.hat, scale.outcomes, solver, tol, ...) {
+  idx_k    <- which(fold_ids == k)
+  idx_notk <- which(fold_ids != k)
+
+  A_k <- A[idx_k]; Y_k <- Y[idx_k]
+
+  # Skip if a treatment group is empty in this fold
+  if (sum(A_k == 1) == 0 || sum(A_k == 0) == 0) {
+    return(list(idx = idx_k, ate = NA, weights = rep(NA, length(idx_k)),
+                mu1 = NULL, mu0 = NULL, forest = NULL, solver = NULL))
+  }
+
+  # Fit kernel and compute weights
+  kb <- .fit_kernel_and_balance(
+    X_train = X[idx_notk, , drop = FALSE],
+    A_train = A[idx_notk], Y_train = Y[idx_notk],
+    X_pred = X[idx_k, , drop = FALSE], A_pred = A_k,
+    num.trees = num.trees, min.node.size = min.node.size,
+    scale.outcomes = scale.outcomes, solver = solver, tol = tol, ...
+  )
+
+  # Outcome model predictions for augmentation
+  mu1_k <- NULL; mu0_k <- NULL
+  if (augmented) {
+    if (is.null(mu.hat)) {
+      mu_k <- .fit_outcome_models(
+        X_train = X[idx_notk, , drop = FALSE],
+        A_train = A[idx_notk], Y_train = Y[idx_notk],
+        X_pred = X[idx_k, , drop = FALSE], num.trees = num.trees
+      )
+      mu1_k <- mu_k$mu1
+      mu0_k <- mu_k$mu0
+    } else {
+      mu1_k <- mu.hat$mu1[idx_k]
+      mu0_k <- mu.hat$mu0[idx_k]
+    }
+  }
+
+  ate_k <- .compute_ate(Y_k, A_k, kb$weights, augmented, mu1_k, mu0_k)
+
+  list(idx = idx_k, ate = ate_k, weights = kb$weights,
+       mu1 = mu1_k, mu0 = mu0_k,
+       forest = kb$forest, solver = kb$solver)
+}
+
+
 #' Cross-fitted estimation path
 #' @noRd
 .fit_crossfitted <- function(X, A, Y, num.trees, min.node.size, num.folds,
                              augmented, mu.hat, scale.outcomes, solver,
-                             tol, ...) {
+                             tol, parallel, ...) {
   n <- nrow(X)
-  fold_ids  <- sample(rep(seq_len(num.folds), length.out = n))
+  fold_ids <- sample(rep(seq_len(num.folds), length.out = n))
+
+  # Determine number of cores
+  if (isTRUE(parallel)) {
+    ncores <- parallel::detectCores()
+  } else if (is.numeric(parallel) && parallel > 1) {
+    ncores <- as.integer(parallel)
+  } else {
+    ncores <- 1L
+  }
+
+  # Run folds sequentially or in parallel
+  fold_args <- list(fold_ids = fold_ids, X = X, A = A, Y = Y,
+                    num.trees = num.trees, min.node.size = min.node.size,
+                    augmented = augmented, mu.hat = mu.hat,
+                    scale.outcomes = scale.outcomes, solver = solver,
+                    tol = tol, ...)
+
+  run_fold <- function(k) {
+    do.call(.fit_one_fold, c(list(k = k), fold_args))
+  }
+
+  if (ncores > 1L) {
+    fold_results <- parallel::mclapply(seq_len(num.folds), run_fold,
+                                       mc.cores = ncores)
+  } else {
+    fold_results <- lapply(seq_len(num.folds), run_fold)
+  }
+
+  # Assemble results from fold outputs
   fold_ates <- numeric(num.folds)
   weights   <- numeric(n)
   mu1_hat   <- if (augmented) numeric(n) else NULL
@@ -330,49 +416,20 @@ forest_balance <- function(X, A, Y,
   last_solver <- NULL
 
   for (k in seq_len(num.folds)) {
-    idx_k    <- which(fold_ids == k)
-    idx_notk <- which(fold_ids != k)
-
-    A_k <- A[idx_k]; Y_k <- Y[idx_k]
-
-    # Skip if a treatment group is empty in this fold
-    if (sum(A_k == 1) == 0 || sum(A_k == 0) == 0) {
-      fold_ates[k] <- NA
-      next
-    }
-
-    # Fit kernel and compute weights
-    kb <- .fit_kernel_and_balance(
-      X_train = X[idx_notk, , drop = FALSE],
-      A_train = A[idx_notk], Y_train = Y[idx_notk],
-      X_pred = X[idx_k, , drop = FALSE], A_pred = A_k,
-      num.trees = num.trees, min.node.size = min.node.size,
-      scale.outcomes = scale.outcomes, solver = solver, tol = tol, ...
-    )
-    weights[idx_k] <- kb$weights
-    last_forest <- kb$forest
-    last_solver <- kb$solver
-
-    # Outcome model predictions for augmentation
+    res_k <- fold_results[[k]]
+    fold_ates[k] <- res_k$ate
+    weights[res_k$idx] <- res_k$weights
     if (augmented) {
-      if (is.null(mu.hat)) {
-        mu_k <- .fit_outcome_models(
-          X_train = X[idx_notk, , drop = FALSE],
-          A_train = A[idx_notk], Y_train = Y[idx_notk],
-          X_pred = X[idx_k, , drop = FALSE], num.trees = num.trees
-        )
-      } else {
-        mu_k <- list(mu1 = mu.hat$mu1[idx_k], mu0 = mu.hat$mu0[idx_k])
-      }
-      mu1_hat[idx_k] <- mu_k$mu1
-      mu0_hat[idx_k] <- mu_k$mu0
+      mu1_hat[res_k$idx] <- res_k$mu1
+      mu0_hat[res_k$idx] <- res_k$mu0
     }
-
-    fold_ates[k] <- .compute_ate(Y_k, A_k, kb$weights, augmented,
-                                 mu1_hat[idx_k], mu0_hat[idx_k])
+    if (!is.null(res_k$forest)) {
+      last_forest <- res_k$forest
+      last_solver <- res_k$solver
+    }
   }
 
-  # Assign user-supplied mu.hat if provided (overwrite the initialized vectors)
+  # Assign user-supplied mu.hat if provided
   if (augmented && !is.null(mu.hat)) {
     mu1_hat <- mu.hat$mu1
     mu0_hat <- mu.hat$mu0
