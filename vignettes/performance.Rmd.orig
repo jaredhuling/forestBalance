@@ -258,6 +258,84 @@ legend("topleft", legend = paste("n =", format(n_test, big.mark = ",")),
 
 The pipeline scales approximately linearly in both $n$ and $B$.
 
+## Pipeline stage breakdown
+
+The following experiment profiles each stage of the pipeline individually to
+show where time is spent at different scales:
+
+```{r breakdown, cache=TRUE}
+breakdown <- do.call(rbind, lapply(
+  list(c(1000, 500), c(5000, 500), c(5000, 2000),
+       c(25000, 500), c(25000, 1000)),
+  function(cfg) {
+    nn <- cfg[1]; B_val <- cfg[2]
+    set.seed(123)
+    dat <- simulate_data(n = nn, p = 10)
+    mns <- max(20L, min(floor(nn / 200) + 10, floor(nn / 50)))
+
+    # 1. Forest fitting
+    t_fit <- system.time({
+      resp <- scale(cbind(dat$A, dat$Y))
+      forest <- grf::multi_regression_forest(dat$X, Y = resp,
+                        num.trees = B_val, min.node.size = mns)
+    })["elapsed"]
+
+    # 2. Leaf extraction (Rcpp)
+    t_leaf <- system.time(
+      leaf_mat <- get_leaf_node_matrix(forest, dat$X)
+    )["elapsed"]
+
+    # 3. Z construction (Rcpp)
+    t_z <- system.time(
+      Z <- leaf_node_kernel_Z(leaf_mat)
+    )["elapsed"]
+
+    # 4. Weight computation (kernel_balance)
+    t_bal <- system.time(
+      w <- kernel_balance(dat$A, Z = Z, num.trees = B_val, solver = "cg")
+    )["elapsed"]
+
+    data.frame(n = nn, trees = B_val, mns = mns,
+               fit = t_fit, leaf = t_leaf, Z = t_z, balance = t_bal,
+               total = t_fit + t_leaf + t_z + t_bal)
+  }
+))
+```
+
+```{r breakdown-table, echo=FALSE}
+btbl <- breakdown
+btbl$fit     <- round(btbl$fit, 2)
+btbl$leaf    <- round(btbl$leaf, 2)
+btbl$Z       <- round(btbl$Z, 3)
+btbl$balance <- round(btbl$balance, 2)
+btbl$total   <- round(btbl$total, 2)
+names(btbl) <- c("n", "Trees", "mns", "Forest fit (s)", "Leaf extract (s)",
+                  "Z build (s)", "Balance (s)", "Total (s)")
+knitr::kable(btbl, row.names = FALSE, align = "rrrrrrrr",
+             caption = "Time per pipeline stage (CG solver, single fold).")
+```
+
+```{r breakdown-plot, echo=FALSE, fig.height=4}
+# Stacked bar chart
+labels <- paste0("n=", format(breakdown$n, big.mark = ","),
+                 "\nB=", breakdown$trees)
+bar_data <- t(as.matrix(breakdown[, c("fit", "leaf", "Z", "balance")]))
+colnames(bar_data) <- labels
+
+cols <- c("grey70", "#56B4E9", "#009E73", "#CC79A7")
+par(mar = c(5, 4.5, 2, 1))
+bp <- barplot(bar_data, col = cols, ylab = "Time (s)",
+              main = "Pipeline stage breakdown", las = 1)
+legend("topleft",
+       legend = c("Forest fit", "Leaf extract (C++)", "Z build (C++)", "Balance (CG)"),
+       fill = cols, bty = "n", cex = 0.8)
+```
+
+At small $n$, forest fitting and the balance solver take similar time.  At
+large $n$, the CG solver dominates --- its cost grows with the number of
+iterations and the sparse matrix--vector product size.  The C++ stages (leaf
+extraction and $Z$ construction) remain a small fraction throughout.
+
 ## Memory usage
 
 When the direct solver is used, the kernel is formed as a sparse matrix.
