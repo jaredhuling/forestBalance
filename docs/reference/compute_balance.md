@@ -28,9 +28,9 @@ print(x, threshold = 0.1, ...)
 
   A numeric weight vector of length \\n\\. Treated weights should sum to
   \\n_1\\ and control weights to \\n_0\\ (as returned by
-  [`kernel_balance`](http://jaredhuling.org/forestBalance/reference/kernel_balance.md)
+  [`kernel_balance`](https://jaredhuling.github.io/forestBalance/reference/kernel_balance.md)
   or
-  [`forest_balance`](http://jaredhuling.org/forestBalance/reference/forest_balance.md)).
+  [`forest_balance`](https://jaredhuling.github.io/forestBalance/reference/forest_balance.md)).
 
 - X.trans:
 

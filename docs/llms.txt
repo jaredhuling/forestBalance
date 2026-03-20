@@ -71,7 +71,7 @@ The method proceeds in three steps:
 
 ### Simulating data
 
-[`simulate_data()`](http://jaredhuling.org/forestBalance/reference/simulate_data.md)
+[`simulate_data()`](https://jaredhuling.github.io/forestBalance/reference/simulate_data.md)
 generates observational data with nonlinear confounding through a Beta
 density link:
 
@@ -225,7 +225,7 @@ summary(fit, X.trans = X.nl)
 
 ### Standalone balance diagnostics
 
-[`compute_balance()`](http://jaredhuling.org/forestBalance/reference/compute_balance.md)
+[`compute_balance()`](https://jaredhuling.github.io/forestBalance/reference/compute_balance.md)
 can be used independently with any set of weights:
 
 ``` r
@@ -302,48 +302,51 @@ for (r in seq_len(nreps)) {
 
 | Function | Description |
 |----|----|
-| [`forest_balance()`](http://jaredhuling.org/forestBalance/reference/forest_balance.md) | High-level: fit forest, build kernel, compute weights, return ATE |
-| [`simulate_data()`](http://jaredhuling.org/forestBalance/reference/simulate_data.md) | Simulate observational data with nonlinear confounding |
-| [`compute_balance()`](http://jaredhuling.org/forestBalance/reference/compute_balance.md) | Covariate balance diagnostics (SMD, ESS, energy distance) |
-| [`get_leaf_node_matrix()`](http://jaredhuling.org/forestBalance/reference/get_leaf_node_matrix.md) | Fast vectorized leaf node extraction from grf forests |
-| [`leaf_node_kernel()`](http://jaredhuling.org/forestBalance/reference/leaf_node_kernel.md) | Sparse proximity kernel from leaf node matrix |
-| [`forest_kernel()`](http://jaredhuling.org/forestBalance/reference/forest_kernel.md) | Convenience: forest object to kernel in one call |
-| [`kernel_balance()`](http://jaredhuling.org/forestBalance/reference/kernel_balance.md) | Closed-form kernel energy balancing weights |
+| [`forest_balance()`](https://jaredhuling.github.io/forestBalance/reference/forest_balance.md) | High-level: fit forest, build kernel, compute weights, return ATE |
+| [`simulate_data()`](https://jaredhuling.github.io/forestBalance/reference/simulate_data.md) | Simulate observational data with nonlinear confounding |
+| [`compute_balance()`](https://jaredhuling.github.io/forestBalance/reference/compute_balance.md) | Covariate balance diagnostics (SMD, ESS, energy distance) |
+| [`get_leaf_node_matrix()`](https://jaredhuling.github.io/forestBalance/reference/get_leaf_node_matrix.md) | Fast vectorized leaf node extraction from grf forests |
+| [`leaf_node_kernel()`](https://jaredhuling.github.io/forestBalance/reference/leaf_node_kernel.md) | Sparse proximity kernel from leaf node matrix |
+| [`forest_kernel()`](https://jaredhuling.github.io/forestBalance/reference/forest_kernel.md) | Convenience: forest object to kernel in one call |
+| [`kernel_balance()`](https://jaredhuling.github.io/forestBalance/reference/kernel_balance.md) | Closed-form kernel energy balancing weights |
 
 # Package index
 
 ## All functions
 
-- [`compute_balance()`](http://jaredhuling.org/forestBalance/reference/compute_balance.md)
-  [`print(`*`<forest_balance_diag>`*`)`](http://jaredhuling.org/forestBalance/reference/compute_balance.md)
+- [`compute_balance()`](https://jaredhuling.github.io/forestBalance/reference/compute_balance.md)
+  [`print(`*`<forest_balance_diag>`*`)`](https://jaredhuling.github.io/forestBalance/reference/compute_balance.md)
   : Compute covariate balance diagnostics for a set of weights
-- [`forest_balance()`](http://jaredhuling.org/forestBalance/reference/forest_balance.md)
+- [`forestBalance`](https://jaredhuling.github.io/forestBalance/reference/forestBalance-package.md)
+  [`forestBalance-package`](https://jaredhuling.github.io/forestBalance/reference/forestBalance-package.md)
+  : forestBalance: Forest Kernel Energy Balancing for Causal Inference
+- [`forest_balance()`](https://jaredhuling.github.io/forestBalance/reference/forest_balance.md)
   : Estimate ATE using forest-based kernel energy balancing
-- [`forest_kernel()`](http://jaredhuling.org/forestBalance/reference/forest_kernel.md)
+- [`forest_kernel()`](https://jaredhuling.github.io/forestBalance/reference/forest_kernel.md)
   : Compute random forest proximity kernel from a GRF forest
-- [`get_leaf_node_matrix()`](http://jaredhuling.org/forestBalance/reference/get_leaf_node_matrix.md)
+- [`get_leaf_node_matrix()`](https://jaredhuling.github.io/forestBalance/reference/get_leaf_node_matrix.md)
   : Extract leaf node membership matrix from a GRF forest
-- [`kernel_balance()`](http://jaredhuling.org/forestBalance/reference/kernel_balance.md)
+- [`kernel_balance()`](https://jaredhuling.github.io/forestBalance/reference/kernel_balance.md)
   : Kernel energy balancing weights via closed-form solution
-- [`leaf_node_kernel()`](http://jaredhuling.org/forestBalance/reference/leaf_node_kernel.md)
+- [`leaf_node_kernel()`](https://jaredhuling.github.io/forestBalance/reference/leaf_node_kernel.md)
   : Compute random forest proximity kernel from a leaf node matrix
-- [`leaf_node_kernel_Z()`](http://jaredhuling.org/forestBalance/reference/leaf_node_kernel_Z.md)
+- [`leaf_node_kernel_Z()`](https://jaredhuling.github.io/forestBalance/reference/leaf_node_kernel_Z.md)
   : Build the sparse indicator matrix Z from a leaf node matrix
-- [`print(`*`<forest_balance>`*`)`](http://jaredhuling.org/forestBalance/reference/print.forest_balance.md)
+- [`print(`*`<forest_balance>`*`)`](https://jaredhuling.github.io/forestBalance/reference/print.forest_balance.md)
   : Print a forest_balance object
-- [`simulate_data()`](http://jaredhuling.org/forestBalance/reference/simulate_data.md)
+- [`simulate_data()`](https://jaredhuling.github.io/forestBalance/reference/simulate_data.md)
   : Simulate observational study data with confounding
-- [`summary(`*`<forest_balance>`*`)`](http://jaredhuling.org/forestBalance/reference/summary.forest_balance.md)
-  [`print(`*`<summary.forest_balance>`*`)`](http://jaredhuling.org/forestBalance/reference/summary.forest_balance.md)
+- [`summary(`*`<forest_balance>`*`)`](https://jaredhuling.github.io/forestBalance/reference/summary.forest_balance.md)
+  [`print(`*`<summary.forest_balance>`*`)`](https://jaredhuling.github.io/forestBalance/reference/summary.forest_balance.md)
   : Summarize a forest_balance object
 
 # Articles
 
-### All vignettes
+### Vignettes
 
-- [Cross-Fitting for Debiased Kernel
-  Estimation](http://jaredhuling.org/forestBalance/articles/crossfitting.md):
 - [Getting Started with
-  forestBalance](http://jaredhuling.org/forestBalance/articles/guide.md):
+  forestBalance](https://jaredhuling.github.io/forestBalance/articles/guide.md):
+- [Cross-Fitting for Debiased Kernel
+  Estimation](https://jaredhuling.github.io/forestBalance/articles/crossfitting.md):
 - [Performance and
-  Scalability](http://jaredhuling.org/forestBalance/articles/performance.md):
+  Scalability](https://jaredhuling.github.io/forestBalance/articles/performance.md):

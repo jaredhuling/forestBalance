@@ -19,7 +19,7 @@ print(x, ...)
 - object:
 
   A `forest_balance` object returned by
-  [`forest_balance`](http://jaredhuling.org/forestBalance/reference/forest_balance.md).
+  [`forest_balance`](https://jaredhuling.github.io/forestBalance/reference/forest_balance.md).
 
 - X.trans:
 

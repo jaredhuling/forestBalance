@@ -1,10 +1,10 @@
 # Articles
 
-### All vignettes
+### Vignettes
 
-- [Cross-Fitting for Debiased Kernel
-  Estimation](http://jaredhuling.org/forestBalance/articles/crossfitting.md):
 - [Getting Started with
-  forestBalance](http://jaredhuling.org/forestBalance/articles/guide.md):
+  forestBalance](https://jaredhuling.github.io/forestBalance/articles/guide.md):
+- [Cross-Fitting for Debiased Kernel
+  Estimation](https://jaredhuling.github.io/forestBalance/articles/crossfitting.md):
 - [Performance and
-  Scalability](http://jaredhuling.org/forestBalance/articles/performance.md):
+  Scalability](https://jaredhuling.github.io/forestBalance/articles/performance.md):

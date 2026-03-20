@@ -29,9 +29,9 @@ A symmetric numeric matrix of dimension \\n \times n\\.
 ## Details
 
 This is a convenience function that calls
-[`get_leaf_node_matrix`](http://jaredhuling.org/forestBalance/reference/get_leaf_node_matrix.md)
+[`get_leaf_node_matrix`](https://jaredhuling.github.io/forestBalance/reference/get_leaf_node_matrix.md)
 followed by
-[`leaf_node_kernel`](http://jaredhuling.org/forestBalance/reference/leaf_node_kernel.md).
+[`leaf_node_kernel`](https://jaredhuling.github.io/forestBalance/reference/leaf_node_kernel.md).
 If you need both the leaf matrix and the kernel, it is more efficient to
 call them separately.
 

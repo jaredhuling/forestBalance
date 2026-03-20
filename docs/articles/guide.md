@@ -30,7 +30,7 @@ library(WeightIt)
 
 ## Simulating data
 
-[`simulate_data()`](http://jaredhuling.org/forestBalance/reference/simulate_data.md)
+[`simulate_data()`](https://jaredhuling.github.io/forestBalance/reference/simulate_data.md)
 generates observational data with nonlinear confounding. The propensity
 score depends on $`X_1`$ through a Beta density, and the outcome depends
 nonlinearly on $`X_1`$, $`X_2`$, and $`X_5`$:
@@ -176,7 +176,7 @@ summary(fit_fb, X.trans = X.nl)
 ```
 
 We can use
-[`compute_balance()`](http://jaredhuling.org/forestBalance/reference/compute_balance.md)
+[`compute_balance()`](https://jaredhuling.github.io/forestBalance/reference/compute_balance.md)
 to compare all methods on the same terms:
 
 ``` r

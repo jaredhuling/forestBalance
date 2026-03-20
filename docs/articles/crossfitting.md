@@ -17,7 +17,7 @@ pronounced:
 library(forestBalance)
 
 set.seed(123)
-nreps <- 10
+nreps <- 5
 
 res <- matrix(NA, nreps, 3,
               dimnames = list(NULL, c("No CF (mns=10)", "CF (default)", "Oracle IPW")))
@@ -45,11 +45,11 @@ for (r in seq_len(nreps)) {
 
 | Method         |    Bias |     SD |   RMSE |
 |:---------------|--------:|-------:|-------:|
-| No CF (mns=10) |  0.1692 | 0.0289 | 0.1717 |
-| CF (default)   |  0.0190 | 0.0285 | 0.0342 |
-| Oracle IPW     | -0.0086 | 0.1075 | 0.1078 |
+| No CF (mns=10) |  0.1737 | 0.0361 | 0.1774 |
+| CF (default)   |  0.0215 | 0.0383 | 0.0439 |
+| Oracle IPW     | -0.0058 | 0.1385 | 0.1387 |
 
-n = 10,000, p = 50, true ATE = 0, 10 replications.
+n = 10,000, p = 50, true ATE = 0, 5 replications.
 
 The no-cross-fitting estimator with small leaves has substantial bias.
 The default cross-fitted estimator with adaptive leaf size achieves much
@@ -125,7 +125,7 @@ curse of dimensionality). `forestBalance` uses an adaptive heuristic:
 
 ``` r
 set.seed(123)
-nreps <- 10
+nreps <- 5
 node_sizes <- c(5, 10, 20, 50, 75, 100)
 n <- 10000; p <- 50
 
@@ -144,14 +144,14 @@ heuristic <- max(20, min(floor(n / 200) + p, floor(n / 50)))
 
 | min.node.size |   Bias |     SD |   RMSE |     |
 |--------------:|-------:|-------:|-------:|:----|
-|             5 | 0.1484 | 0.0365 | 0.1528 |     |
-|            10 | 0.1021 | 0.0211 | 0.1042 |     |
-|            20 | 0.0535 | 0.0232 | 0.0584 |     |
-|            50 | 0.0207 | 0.0293 | 0.0359 |     |
-|            75 | 0.0128 | 0.0377 | 0.0398 |     |
-|           100 | 0.0243 | 0.0311 | 0.0395 | \<– |
+|             5 | 0.1549 | 0.0489 | 0.1624 |     |
+|            10 | 0.0940 | 0.0180 | 0.0957 |     |
+|            20 | 0.0811 | 0.0144 | 0.0824 |     |
+|            50 | 0.0217 | 0.0156 | 0.0267 |     |
+|            75 | 0.0109 | 0.0270 | 0.0292 |     |
+|           100 | 0.0101 | 0.0294 | 0.0311 | \<– |
 
-Cross-fitted estimator (n = 10,000, p = 50, 10 reps). Arrow marks the
+Cross-fitted estimator (n = 10,000, p = 50, 5 reps). Arrow marks the
 adaptive default (mns = 100).
 
 Bias decreases with larger leaves until variance begins to dominate. The
@@ -167,13 +167,13 @@ fit <- forest_balance(dat$X, dat$A, dat$Y)
 fit
 #> Forest Kernel Energy Balancing (cross-fitted)
 #> -------------------------------------------------- 
-#>   n = 2,000  (n_treated = 701, n_control = 1299)
+#>   n = 2,000  (n_treated = 717, n_control = 1283)
 #>   Trees: 1000
 #>   Cross-fitting: 2 folds
 #>   Solver: direct
-#>   ATE estimate: 0.1368
-#>   Fold ATEs: 0.1721, 0.1015
-#>   ESS: treated = 493/701 (70%)   control = 945/1299 (73%)
+#>   ATE estimate: 0.1097
+#>   Fold ATEs: 0.1429, 0.0765
+#>   ESS: treated = 486/717 (68%)   control = 945/1283 (74%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
 ```
@@ -185,11 +185,11 @@ fit_nocf <- forest_balance(dat$X, dat$A, dat$Y, cross.fitting = FALSE)
 fit_nocf
 #> Forest Kernel Energy Balancing
 #> -------------------------------------------------- 
-#>   n = 2,000  (n_treated = 701, n_control = 1299)
+#>   n = 2,000  (n_treated = 717, n_control = 1283)
 #>   Trees: 1000
 #>   Solver: direct
-#>   ATE estimate: 0.1104
-#>   ESS: treated = 439/701 (63%)   control = 880/1299 (68%)
+#>   ATE estimate: 0.0521
+#>   ESS: treated = 420/717 (59%)   control = 886/1283 (69%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
 ```
@@ -201,13 +201,13 @@ fit_custom <- forest_balance(dat$X, dat$A, dat$Y, min.node.size = 50)
 fit_custom
 #> Forest Kernel Energy Balancing (cross-fitted)
 #> -------------------------------------------------- 
-#>   n = 2,000  (n_treated = 701, n_control = 1299)
+#>   n = 2,000  (n_treated = 717, n_control = 1283)
 #>   Trees: 1000
 #>   Cross-fitting: 2 folds
 #>   Solver: direct
-#>   ATE estimate: 0.1097
-#>   Fold ATEs: 0.166, 0.0534
-#>   ESS: treated = 417/701 (60%)   control = 820/1299 (63%)
+#>   ATE estimate: 0.0277
+#>   Fold ATEs: -0.0616, 0.1171
+#>   ESS: treated = 406/717 (57%)   control = 836/1283 (65%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
 ```
@@ -222,7 +222,7 @@ modest effect compared to the leaf size. Values of 2–5 all work well:
 
 ``` r
 set.seed(123)
-nreps <- 10
+nreps <- 5
 n <- 5000
 
 fold_res <- do.call(rbind, lapply(c(2, 3, 5, 10), function(nfolds) {
@@ -239,10 +239,10 @@ fold_res <- do.call(rbind, lapply(c(2, 3, 5, 10), function(nfolds) {
 
 | Folds |   Bias |     SD |   RMSE |
 |------:|-------:|-------:|-------:|
-|     2 | 0.0027 | 0.0493 | 0.0494 |
-|     3 | 0.0430 | 0.0447 | 0.0620 |
-|     5 | 0.0802 | 0.0427 | 0.0909 |
-|    10 | 0.2005 | 0.0421 | 0.2048 |
+|     2 | 0.0193 | 0.0405 | 0.0448 |
+|     3 | 0.0398 | 0.0357 | 0.0534 |
+|     5 | 0.0609 | 0.0446 | 0.0755 |
+|    10 | 0.2014 | 0.0456 | 0.2065 |
 
 Effect of number of folds (n = 5,000, adaptive leaf size).
 

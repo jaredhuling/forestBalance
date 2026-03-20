@@ -73,7 +73,7 @@ forest_balance(
   Which linear solver to use for the balancing weights. `"auto"`
   (default) selects `"direct"` for small fold sizes and `"cg"` for large
   fold sizes. See
-  [`kernel_balance`](http://jaredhuling.org/forestBalance/reference/kernel_balance.md)
+  [`kernel_balance`](https://jaredhuling.github.io/forestBalance/reference/kernel_balance.md)
   for details.
 
 - tol:
@@ -139,7 +139,7 @@ elements:
   Fold assignments (if cross-fitting was used).
 
 The object has `print` and `summary` methods. Use
-[`summary.forest_balance`](http://jaredhuling.org/forestBalance/reference/summary.forest_balance.md)
+[`summary.forest_balance`](https://jaredhuling.github.io/forestBalance/reference/summary.forest_balance.md)
 for covariate balance diagnostics.
 
 ## Details
@@ -157,7 +157,7 @@ The method proceeds in three steps:
     share a leaf. Because the forest splits on both \\A\\ and \\Y\\,
     this kernel captures confounding structure.
 
-3.  [`kernel_balance`](http://jaredhuling.org/forestBalance/reference/kernel_balance.md)
+3.  [`kernel_balance`](https://jaredhuling.github.io/forestBalance/reference/kernel_balance.md)
     computes balancing weights via the closed-form kernel energy
     distance solution. The ATE is then estimated using the Hajek (ratio)
     estimator with these weights.

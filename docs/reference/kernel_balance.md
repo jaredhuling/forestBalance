@@ -34,7 +34,7 @@ kernel_balance(
 - Z:
 
   Optional sparse indicator matrix from
-  [`leaf_node_kernel_Z`](http://jaredhuling.org/forestBalance/reference/leaf_node_kernel_Z.md)
+  [`leaf_node_kernel_Z`](https://jaredhuling.github.io/forestBalance/reference/leaf_node_kernel_Z.md)
   such that \\K = Z Z^\top / B\\. When supplied, the solver can avoid
   forming the full kernel matrix. If both `kern` and `Z` are given, `Z`
   takes priority when the CG solver is selected.

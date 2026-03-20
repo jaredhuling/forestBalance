@@ -18,7 +18,7 @@ leaf_node_kernel(leaf_matrix, sparse = TRUE)
   An integer matrix of dimension \\n \times B\\, where
   `leaf_matrix[i, b]` is the leaf node ID for observation `i` in tree
   `b`. Typically produced by
-  [`get_leaf_node_matrix`](http://jaredhuling.org/forestBalance/reference/get_leaf_node_matrix.md).
+  [`get_leaf_node_matrix`](https://jaredhuling.github.io/forestBalance/reference/get_leaf_node_matrix.md).
 
 - sparse:
 

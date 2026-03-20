@@ -3,7 +3,7 @@
 Returns the sparse \\n \times L\\ indicator matrix \\Z\\ such that the
 proximity kernel is \\K = Z Z^\top / B\\. This factored representation
 can be passed to
-[`kernel_balance`](http://jaredhuling.org/forestBalance/reference/kernel_balance.md)
+[`kernel_balance`](https://jaredhuling.github.io/forestBalance/reference/kernel_balance.md)
 to enable the CG solver, which avoids forming the full \\n \times n\\
 kernel.
 
@@ -20,7 +20,7 @@ leaf_node_kernel_Z(leaf_matrix)
   An integer matrix of dimension \\n \times B\\, where
   `leaf_matrix[i, b]` is the leaf node ID for observation `i` in tree
   `b`. Typically produced by
-  [`get_leaf_node_matrix`](http://jaredhuling.org/forestBalance/reference/get_leaf_node_matrix.md).
+  [`get_leaf_node_matrix`](https://jaredhuling.github.io/forestBalance/reference/get_leaf_node_matrix.md).
 
 ## Value
 

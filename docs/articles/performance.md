@@ -124,7 +124,7 @@ both $`n`$ and $`B`$, making it the preferred solver for large problems.
 ## End-to-end timing
 
 We benchmark the full
-[`forest_balance()`](http://jaredhuling.org/forestBalance/reference/forest_balance.md)
+[`forest_balance()`](https://jaredhuling.github.io/forestBalance/reference/forest_balance.md)
 pipeline (forest fitting, leaf extraction, kernel/Z construction, and
 weight computation) across a range of sample sizes with $`B = 1{,}000`$
 trees. To show the effect of solver choice, we run each $`n`$ with both
@@ -289,7 +289,7 @@ reduction.
 ## Summary
 
 - The full
-  [`forest_balance()`](http://jaredhuling.org/forestBalance/reference/forest_balance.md)
+  [`forest_balance()`](https://jaredhuling.github.io/forestBalance/reference/forest_balance.md)
   pipeline scales to **$`n = 25{,}000`$** in under a minute with 1,000
   trees.
 - The adaptive `min.node.size` heuristic adjusts leaf size to both $`n`$

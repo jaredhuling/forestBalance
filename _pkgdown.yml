@@ -1,4 +1,7 @@
-url: ~
+url: https://jaredhuling.github.io/forestBalance/
+
+template:
+  bootstrap: 5
 
 navbar:
   structure:
