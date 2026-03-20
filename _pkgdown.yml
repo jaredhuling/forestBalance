@@ -1,5 +1,19 @@
 url: ~
 
+navbar:
+  structure:
+    left: [intro, articles, reference]
+  components:
+    articles:
+      text: Articles
+      menu:
+        - text: Getting Started with forestBalance
+          href: articles/guide.html
+        - text: Cross-Fitting for Debiased Kernel Estimation
+          href: articles/crossfitting.html
+        - text: Performance and Scalability
+          href: articles/performance.html
+
 articles:
   - title: Vignettes
     contents:
