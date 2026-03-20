@@ -161,7 +161,7 @@ leaf_res$rmse <- round(leaf_res$rmse, 4)
 leaf_res$default <- ifelse(leaf_res$mns == heuristic, "<--", "")
 names(leaf_res) <- c("min.node.size", "Bias", "SD", "RMSE", "")
 knitr::kable(leaf_res, row.names = FALSE, align = "rrrrl",
-             caption = sprintf("Cross-fitted estimator (n = %s, p = %d, 10 reps). Arrow marks the adaptive default (mns = %d).",
+             caption = sprintf("Cross-fitted estimator (n = %s, p = %d, 5 reps). Arrow marks the adaptive default (mns = %d).",
                                format(n, big.mark = ","), p, heuristic))
 ```
 
