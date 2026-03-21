@@ -129,15 +129,17 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, num.trees = NULL,
     cg_t <- function(rhs) .cg_solve(Z_t, B * rhs, tol, maxiter)
     cg_c <- function(rhs) .cg_solve(Z_c, B * rhs, tol, maxiter)
 
-    # Treated block
+    # Treated block: only 2 solves needed.
+    # The 3rd RHS z_t = b_t - c*1 is a linear combination, so
+    # solve(K, z_t) = solve(K, b_t) - c * solve(K, 1).
     s1 <- cg_t(ones_t);   sb <- cg_t(b[idx_t])
     X11 <- n1^2 * sum(s1); YY1 <- n1^2 * sum(sb) - n1
-    w_t <- n1^2 * cg_t(b[idx_t] - (YY1 / X11))
+    w_t <- n1^2 * (sb - (YY1 / X11) * s1)
 
-    # Control block
+    # Control block: same 2-solve optimization.
     s1 <- cg_c(ones_c);   sb <- cg_c(b[idx_c])
     X22 <- n0^2 * sum(s1); YY2 <- n0^2 * sum(sb) - n0
-    w_c <- n0^2 * cg_c(b[idx_c] - (YY2 / X22))
+    w_c <- n0^2 * (sb - (YY2 / X22) * s1)
 
   } else {
     # ------------------------------------------------------------------
@@ -159,17 +161,18 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, num.trees = NULL,
     K_tt <- kern[idx_t, idx_t]
     K_cc <- kern[idx_c, idx_c]
 
-    # Treated block (K_tt caches its Cholesky after first solve)
+    # Treated block: 2 solves (Cholesky cached after first).
+    # The 3rd RHS is a linear combination, so we recombine solutions.
     s1 <- as.numeric(solve(K_tt, ones_t))
     sb <- as.numeric(solve(K_tt, b[idx_t]))
     X11 <- n1^2 * sum(s1); YY1 <- n1^2 * sum(sb) - n1
-    w_t <- n1^2 * as.numeric(solve(K_tt, b[idx_t] - (YY1 / X11)))
+    w_t <- n1^2 * (sb - (YY1 / X11) * s1)
 
-    # Control block
+    # Control block: same 2-solve optimization.
     s1 <- as.numeric(solve(K_cc, ones_c))
     sb <- as.numeric(solve(K_cc, b[idx_c]))
     X22 <- n0^2 * sum(s1); YY2 <- n0^2 * sum(sb) - n0
-    w_c <- n0^2 * as.numeric(solve(K_cc, b[idx_c] - (YY2 / X22)))
+    w_c <- n0^2 * (sb - (YY2 / X22) * s1)
   }
 
   # Reassemble
