@@ -283,11 +283,12 @@ breakdown <- do.call(rbind, lapply(
 | 25000 | 500 | 135 | 1.01 | 0.51 | 0.073 | 41.74 | 43.33 |
 | 25000 | 1000 | 135 | 1.87 | 1.00 | 0.180 | 82.89 | 85.93 |
 
-Time per pipeline stage (CG solver, single fold).
+Wall-clock time for each pipeline stage across configurations (CG
+solver, single fold).
 
-![plot of chunk breakdown-plot](performance-breakdown-plot-1.png)
+![Computation breakdown plot](performance-breakdown-plot-1.png)
 
-plot of chunk breakdown-plot
+Computation breakdown plot
 
 At small $`n`$, forest fitting and the balance solver take similar time.
 At large $`n`$, the CG solver dominates — its cost grows with the number

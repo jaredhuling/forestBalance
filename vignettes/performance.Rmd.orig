@@ -312,23 +312,25 @@ btbl$total   <- round(btbl$total, 2)
 names(btbl) <- c("n", "Trees", "mns", "Forest fit (s)", "Leaf extract (s)",
                   "Z build (s)", "Balance (s)", "Total (s)")
 knitr::kable(btbl, row.names = FALSE, align = "rrrrrrrr",
-             caption = "Time per pipeline stage (CG solver, single fold).")
+             caption = "Wall-clock time for each pipeline stage across configurations (CG solver, single fold).")
 ```
 
-```{r breakdown-plot, echo=FALSE, fig.height=4}
+```{r breakdown-plot, echo=FALSE, fig.width=7, fig.height=5}
 # Stacked bar chart
 labels <- paste0("n=", format(breakdown$n, big.mark = ","),
-                 "\nB=", breakdown$trees)
+                 ", B=", breakdown$trees)
 bar_data <- t(as.matrix(breakdown[, c("fit", "leaf", "Z", "balance")]))
 colnames(bar_data) <- labels
 
 cols <- c("grey70", "#56B4E9", "#009E73", "#CC79A7")
-par(mar = c(5, 4.5, 2, 1))
-bp <- barplot(bar_data, col = cols, ylab = "Time (s)",
-              main = "Pipeline stage breakdown", las = 1)
+par(mar = c(7, 4.5, 3, 1))
+bp <- barplot(bar_data, col = cols, ylab = "Time (seconds)",
+              main = "Time spent in each pipeline stage",
+              las = 2, cex.names = 0.9)
 legend("topleft",
-       legend = c("Forest fit", "Leaf extract (C++)", "Z build (C++)", "Balance (CG)"),
-       fill = cols, bty = "n", cex = 0.8)
+       legend = c("Forest fit (grf, C++)", "Leaf extraction (Rcpp)",
+                  "Z construction (Rcpp)", "Weight solver (CG)"),
+       fill = cols, bty = "n", cex = 0.85)
 ```
 
 At small $n$, forest fitting and the balance solver take similar time.  At

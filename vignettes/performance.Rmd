@@ -284,7 +284,7 @@ breakdown <- do.call(rbind, lapply(
 
 
 
-Table: Time per pipeline stage (CG solver, single fold).
+Table: Wall-clock time for each pipeline stage across configurations (CG solver, single fold).
 
 |     n| Trees| mns| Forest fit (s)| Leaf extract (s)| Z build (s)| Balance (s)| Total (s)|
 |-----:|-----:|---:|--------------:|----------------:|-----------:|-----------:|---------:|
@@ -296,7 +296,7 @@ Table: Time per pipeline stage (CG solver, single fold).
 
 
 
-![plot of chunk breakdown-plot](performance-breakdown-plot-1.png)
+![Computation breakdown plot](performance-breakdown-plot-1.png)
 
 At small $n$, forest fitting and the balance solver take similar time.  At
 large $n$, the CG solver dominates --- its cost grows with the number of
