@@ -14,8 +14,8 @@ kernel_balance(
   Z = NULL,
   num.trees = NULL,
   solver = c("auto", "direct", "cg"),
-  tol = 5e-11,
-  maxiter = 1000L
+  tol = 1e-08,
+  maxiter = 2000L
 )
 ```
 
@@ -53,7 +53,7 @@ kernel_balance(
 
 - tol:
 
-  Convergence tolerance for the CG solver. Default is `5e-11`. Ignored
+  Convergence tolerance for the CG solver. Default is `1e-8`. Ignored
   when `solver = "direct"`.
 
 - maxiter:

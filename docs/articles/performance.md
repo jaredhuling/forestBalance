@@ -172,13 +172,13 @@ bench <- do.call(rbind, lapply(n_vals, function(nn) {
 
 |     n | Trees | Direct (s) | CG (s) | Auto picks |
 |------:|------:|-----------:|:-------|:-----------|
-|   500 |  1000 |       0.07 | 0.20   | cg         |
-|  1000 |  1000 |       0.17 | 0.50   | direct     |
-|  2500 |  1000 |       0.62 | 1.34   | direct     |
-|  5000 |  1000 |       2.06 | 3.95   | direct     |
-| 10000 |  1000 |       9.30 | 14.63  | direct     |
-| 25000 |  1000 |          – | 74.56  | cg         |
-| 50000 |  1000 |          – | 174.63 | cg         |
+|   500 |  1000 |       0.08 | 0.15   | cg         |
+|  1000 |  1000 |       0.18 | 0.40   | direct     |
+|  2500 |  1000 |       0.73 | 0.99   | direct     |
+|  5000 |  1000 |       2.33 | 2.71   | direct     |
+| 10000 |  1000 |      10.75 | 9.23   | direct     |
+| 25000 |  1000 |          – | 85.57  | cg         |
+| 50000 |  1000 |          – | 248.59 | cg         |
 
 Full pipeline time by solver.
 
@@ -210,18 +210,18 @@ tree_bench <- do.call(rbind, lapply(n_test, function(nn) {
 
 |     n | Trees | Time (s) |
 |------:|------:|---------:|
-|  1000 |   200 |     0.05 |
+|  1000 |   200 |     0.06 |
 |  1000 |   500 |     0.10 |
-|  1000 |  1000 |     0.17 |
-|  1000 |  2000 |     0.34 |
-|  5000 |   200 |     0.92 |
-|  5000 |   500 |     1.29 |
-|  5000 |  1000 |     2.28 |
-|  5000 |  2000 |     3.86 |
-| 25000 |   200 |    15.58 |
-| 25000 |   500 |    37.93 |
-| 25000 |  1000 |    74.78 |
-| 25000 |  2000 |   149.45 |
+|  1000 |  1000 |     0.19 |
+|  1000 |  2000 |     0.37 |
+|  5000 |   200 |     0.97 |
+|  5000 |   500 |     1.49 |
+|  5000 |  1000 |     3.01 |
+|  5000 |  2000 |     5.39 |
+| 25000 |   200 |    22.00 |
+| 25000 |   500 |    53.07 |
+| 25000 |  1000 |    85.11 |
+| 25000 |  2000 |   149.72 |
 
 Pipeline time across tree counts.
 
@@ -277,18 +277,18 @@ breakdown <- do.call(rbind, lapply(
 
 | n | Trees | mns | Forest fit (s) | Leaf extract (s) | Z build (s) | Balance (s) | Total (s) |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 1000 | 500 | 20 | 0.03 | 0.02 | 0.003 | 0.21 | 0.26 |
-| 5000 | 500 | 35 | 0.17 | 0.10 | 0.013 | 2.02 | 2.30 |
-| 5000 | 2000 | 35 | 0.64 | 0.41 | 0.098 | 7.73 | 8.87 |
-| 25000 | 500 | 135 | 1.01 | 0.51 | 0.073 | 41.74 | 43.33 |
-| 25000 | 1000 | 135 | 1.87 | 1.00 | 0.180 | 82.89 | 85.93 |
+| 1000 | 500 | 20 | 0.03 | 0.02 | 0.004 | 0.13 | 0.18 |
+| 5000 | 500 | 35 | 0.18 | 0.10 | 0.013 | 1.24 | 1.54 |
+| 5000 | 2000 | 35 | 0.73 | 0.42 | 0.055 | 4.89 | 6.10 |
+| 25000 | 500 | 135 | 1.12 | 0.52 | 0.077 | 54.11 | 55.83 |
+| 25000 | 1000 | 135 | 2.09 | 1.04 | 0.207 | 86.41 | 89.74 |
 
 Wall-clock time for each pipeline stage across configurations (CG
 solver, single fold).
 
-![Computation breakdown plot](performance-breakdown-plot-1.png)
+![plot of chunk breakdown-plot](performance-breakdown-plot-1.png)
 
-Computation breakdown plot
+plot of chunk breakdown-plot
 
 At small $`n`$, forest fitting and the balance solver take similar time.
 At large $`n`$, the CG solver dominates — its cost grows with the number
