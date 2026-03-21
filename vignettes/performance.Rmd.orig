@@ -149,16 +149,36 @@ because the third right-hand side is a linear combination of the first two.
 We compare all three solvers at $n = 10{,}000$ and $n = 25{,}000$:
 
 ```{r solver-compare, cache=TRUE}
+# Fit one forest per n, then time each solver on the SAME kernel system.
 solver_bench <- do.call(rbind, lapply(c(10000, 25000), function(nn) {
   set.seed(123)
   dat <- simulate_data(n = nn, p = 10)
-  do.call(rbind, lapply(c("bj", "cg", "direct"), function(s) {
-    if (s == "direct" && nn > 10000) return(NULL)
-    t <- system.time(
-      fit <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 1000,
-                             solver = s, cross.fitting = FALSE)
-    )["elapsed"]
-    data.frame(n = nn, solver = s, time = t, ate = fit$ate)
+  B_val <- 1000
+  mns <- max(20L, min(floor(nn / 200) + 10, floor(nn / 50)))
+
+  forest <- grf::multi_regression_forest(
+    dat$X, scale(cbind(dat$A, dat$Y)),
+    num.trees = B_val, min.node.size = mns
+  )
+  leaf_mat <- get_leaf_node_matrix(forest, dat$X)
+  Z <- leaf_node_kernel_Z(leaf_mat)
+
+  solvers <- if (nn <= 10000) c("bj", "cg", "direct") else c("bj", "cg")
+  do.call(rbind, lapply(solvers, function(s) {
+    if (s == "direct") {
+      K <- leaf_node_kernel(leaf_mat)
+      t <- system.time(
+        w <- kernel_balance(dat$A, kern = K, solver = "direct")
+      )["elapsed"]
+    } else {
+      t <- system.time(
+        w <- kernel_balance(dat$A, Z = Z, leaf_matrix = leaf_mat,
+                             num.trees = B_val, solver = s)
+      )["elapsed"]
+    }
+    ate <- weighted.mean(dat$Y[dat$A == 1], w$weights[dat$A == 1]) -
+           weighted.mean(dat$Y[dat$A == 0], w$weights[dat$A == 0])
+    data.frame(n = nn, solver = s, time = t, ate = ate)
   }))
 }))
 ```
@@ -166,15 +186,16 @@ solver_bench <- do.call(rbind, lapply(c(10000, 25000), function(nn) {
 ```{r solver-table, echo=FALSE}
 stbl <- solver_bench
 stbl$time <- round(stbl$time, 2)
-stbl$ate <- round(stbl$ate, 4)
+stbl$ate <- round(stbl$ate, 6)
 names(stbl) <- c("n", "Solver", "Time (s)", "ATE")
 knitr::kable(stbl, row.names = FALSE, align = "rlrr",
-             caption = "Solver comparison (no cross-fitting, B = 1,000).")
+             caption = "Solver comparison on the same kernel (B = 1,000). ATE agreement confirms solvers find the same solution.")
 ```
 
-Block Jacobi is the fastest iterative solver.  The direct solver is
-competitive at $n = 10{,}000$ but does not scale to larger problems.  All
-solvers produce similar ATE estimates.
+All solvers produce the same ATE to high precision, confirming they solve the
+same system.  CG (Rcpp) is the robust default; Block Jacobi can be faster in
+specific regimes (moderate leaf size, many trees) and is available via
+`solver = "bj"`.
 
 
 ## End-to-end timing

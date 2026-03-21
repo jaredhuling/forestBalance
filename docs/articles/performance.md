@@ -143,33 +143,55 @@ two.
 We compare all three solvers at $`n = 10{,}000`$ and $`n = 25{,}000`$:
 
 ``` r
+# Fit one forest per n, then time each solver on the SAME kernel system.
 solver_bench <- do.call(rbind, lapply(c(10000, 25000), function(nn) {
   set.seed(123)
   dat <- simulate_data(n = nn, p = 10)
-  do.call(rbind, lapply(c("bj", "cg", "direct"), function(s) {
-    if (s == "direct" && nn > 10000) return(NULL)
-    t <- system.time(
-      fit <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 1000,
-                             solver = s, cross.fitting = FALSE)
-    )["elapsed"]
-    data.frame(n = nn, solver = s, time = t, ate = fit$ate)
+  B_val <- 1000
+  mns <- max(20L, min(floor(nn / 200) + 10, floor(nn / 50)))
+
+  forest <- grf::multi_regression_forest(
+    dat$X, scale(cbind(dat$A, dat$Y)),
+    num.trees = B_val, min.node.size = mns
+  )
+  leaf_mat <- get_leaf_node_matrix(forest, dat$X)
+  Z <- leaf_node_kernel_Z(leaf_mat)
+
+  solvers <- if (nn <= 10000) c("bj", "cg", "direct") else c("bj", "cg")
+  do.call(rbind, lapply(solvers, function(s) {
+    if (s == "direct") {
+      K <- leaf_node_kernel(leaf_mat)
+      t <- system.time(
+        w <- kernel_balance(dat$A, kern = K, solver = "direct")
+      )["elapsed"]
+    } else {
+      t <- system.time(
+        w <- kernel_balance(dat$A, Z = Z, leaf_matrix = leaf_mat,
+                             num.trees = B_val, solver = s)
+      )["elapsed"]
+    }
+    ate <- weighted.mean(dat$Y[dat$A == 1], w$weights[dat$A == 1]) -
+           weighted.mean(dat$Y[dat$A == 0], w$weights[dat$A == 0])
+    data.frame(n = nn, solver = s, time = t, ate = ate)
   }))
 }))
 ```
 
-|     n | Solver | Time (s) |    ATE |
-|------:|:-------|---------:|-------:|
-| 10000 | bj     |     8.45 | 0.0153 |
-| 10000 | cg     |     6.30 | 0.0138 |
-| 10000 | direct |    30.72 | 0.0254 |
-| 25000 | bj     |    40.96 | 0.0063 |
-| 25000 | cg     |    52.66 | 0.0154 |
+|     n | Solver | Time (s) |      ATE |
+|------:|:-------|---------:|---------:|
+| 10000 | bj     |     5.54 | 0.015260 |
+| 10000 | cg     |     4.26 | 0.015261 |
+| 10000 | direct |    17.39 | 0.015260 |
+| 25000 | bj     |    30.47 | 0.006337 |
+| 25000 | cg     |    40.63 | 0.006344 |
 
-Solver comparison (no cross-fitting, B = 1,000).
+Solver comparison on the same kernel (B = 1,000). ATE agreement confirms
+solvers find the same solution.
 
-Block Jacobi is the fastest iterative solver. The direct solver is
-competitive at $`n = 10{,}000`$ but does not scale to larger problems.
-All solvers produce similar ATE estimates.
+All solvers produce the same ATE to high precision, confirming they
+solve the same system. CG (Rcpp) is the robust default; Block Jacobi can
+be faster in specific regimes (moderate leaf size, many trees) and is
+available via `solver = "bj"`.
 
 ## End-to-end timing
 
@@ -200,13 +222,13 @@ bench <- do.call(rbind, lapply(n_vals, function(nn) {
 
 |     n | Trees | Time (s) | Solver |
 |------:|------:|---------:|:-------|
-|   500 |  1000 |     0.17 | cg     |
-|  1000 |  1000 |     0.23 | direct |
-|  2500 |  1000 |     0.96 | direct |
-|  5000 |  1000 |     3.61 | direct |
-| 10000 |  1000 |    16.66 | direct |
-| 25000 |  1000 |    44.27 | cg     |
-| 50000 |  1000 |  1833.80 | cg     |
+|   500 |  1000 |     0.15 | cg     |
+|  1000 |  1000 |     0.18 | direct |
+|  2500 |  1000 |     0.62 | direct |
+|  5000 |  1000 |     2.20 | direct |
+| 10000 |  1000 |     9.51 | direct |
+| 25000 |  1000 |    38.16 | cg     |
+| 50000 |  1000 |   115.98 | cg     |
 
 Full pipeline time (auto solver).
 
@@ -238,18 +260,18 @@ tree_bench <- do.call(rbind, lapply(n_test, function(nn) {
 
 |     n | Trees | Time (s) |
 |------:|------:|---------:|
-|  1000 |   200 |     0.13 |
-|  1000 |   500 |     0.22 |
-|  1000 |  1000 |     0.36 |
-|  1000 |  2000 |     0.71 |
-|  5000 |   200 |     1.87 |
-|  5000 |   500 |     3.56 |
-|  5000 |  1000 |     7.94 |
-|  5000 |  2000 |    10.14 |
-| 25000 |   200 |    20.10 |
-| 25000 |   500 |    49.38 |
-| 25000 |  1000 |    98.42 |
-| 25000 |  2000 |   160.51 |
+|  1000 |   200 |     0.05 |
+|  1000 |   500 |     0.10 |
+|  1000 |  1000 |     0.17 |
+|  1000 |  2000 |     0.34 |
+|  5000 |   200 |     0.93 |
+|  5000 |   500 |     1.30 |
+|  5000 |  1000 |     2.09 |
+|  5000 |  2000 |     3.97 |
+| 25000 |   200 |    10.00 |
+| 25000 |   500 |    23.66 |
+| 25000 |  1000 |    37.66 |
+| 25000 |  2000 |    66.03 |
 
 Pipeline time across tree counts.
 
@@ -305,11 +327,11 @@ breakdown <- do.call(rbind, lapply(
 
 | n | Trees | mns | Forest fit (s) | Leaf extract (s) | Z build (s) | Balance (s) | Total (s) |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 1000 | 500 | 20 | 0.06 | 0.04 | 0.007 | 0.17 | 0.27 |
-| 5000 | 500 | 35 | 0.34 | 0.24 | 0.025 | 1.07 | 1.68 |
-| 5000 | 2000 | 35 | 1.59 | 0.70 | 0.144 | 3.78 | 6.21 |
-| 25000 | 500 | 135 | 2.44 | 0.86 | 0.093 | 47.58 | 50.97 |
-| 25000 | 1000 | 135 | 4.49 | 1.44 | 0.234 | 75.29 | 81.45 |
+| 1000 | 500 | 20 | 0.03 | 0.02 | 0.004 | 0.10 | 0.15 |
+| 5000 | 500 | 35 | 0.17 | 0.11 | 0.012 | 0.65 | 0.94 |
+| 5000 | 2000 | 35 | 0.66 | 0.42 | 0.102 | 2.33 | 3.52 |
+| 25000 | 500 | 135 | 0.94 | 0.53 | 0.069 | 26.14 | 27.68 |
+| 25000 | 1000 | 135 | 1.87 | 1.06 | 0.181 | 41.14 | 44.26 |
 
 Wall-clock time for each pipeline stage across configurations (CG
 solver, single fold).
