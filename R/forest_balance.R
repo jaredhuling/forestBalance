@@ -240,11 +240,9 @@ forest_balance <- function(X, A, Y,
 
 #' Choose solver based on sample size and kernel density
 #' @noRd
-.choose_solver <- function(solver, n_obs, min.node.size) {
+.choose_solver <- function(solver, n_obs, min.node.size, num.trees = 1000) {
   if (solver != "auto") return(solver)
-  if (n_obs > 5000) "bj"
-  else if (min.node.size > n_obs / 20) "cg"
-  else "direct"
+  if (n_obs > 5000 || min.node.size > n_obs / 20) "cg" else "direct"
 }
 
 
@@ -267,7 +265,7 @@ forest_balance <- function(X, A, Y,
   # Extract leaf nodes and build kernel / Z
   leaf_mat <- get_leaf_node_matrix(forest, newdata = X_pred)
   n_pred <- nrow(X_pred)
-  eff_solver <- .choose_solver(solver, n_pred, min.node.size)
+  eff_solver <- .choose_solver(solver, n_pred, min.node.size, num.trees)
 
   if (eff_solver %in% c("bj", "cg")) {
     Z <- leaf_node_kernel_Z(leaf_mat)

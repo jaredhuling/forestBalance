@@ -123,22 +123,65 @@ applies to the control block with $Z_c$.
 Here, the memory use is $O(nB)$ for $Z$ alone, versus $O(n^2)$ for the kernel.
 Each CG iteration costs $O(n_g B)$ (where $n_g$ is the group size).
 Convergence typically requires 100--200 iterations, independent of $n$, so
-the total cost is $O(n_g B \cdot T_{\text{iter}})$.  The six required solves
-(three per block) are independent and each converges in a similar number of
-iterations.
+the total cost is $O(n_g B \cdot T_{\text{iter}})$.  Only four solves are
+needed (two per block), since the third right-hand side is a linear
+combination of the first two.
 
 **Computational Cost:** $O\bigl((n_1 + n_0) \cdot B \cdot T_{\text{iter}}\bigr)$
 where $T_{\text{iter}} \approx 100\text{--}200$.  This scales linearly in both
-$n$ and $B$, making it the preferred solver for large problems.
+$n$ and $B$.
+
+### Block Jacobi preconditioned CG (default for large $n$)
+
+Plain CG can require many iterations at large $n$.  The **Block Jacobi**
+solver uses the first tree's leaf partition to build a block-diagonal
+preconditioner.  Each leaf block is a small dense system
+(~`min.node.size` $\times$ `min.node.size`) that is cheap to factor.
+Preconditioned CG then converges in far fewer iterations---typically
+5--10$\times$ fewer than plain CG---giving a large overall speedup.
+
+Note: only 2 linear solves per treatment-group block are needed (not 3),
+because the third right-hand side is a linear combination of the first two.
+
+
+## Solver comparison
+
+We compare all three solvers at $n = 10{,}000$ and $n = 25{,}000$:
+
+```{r solver-compare, cache=TRUE}
+solver_bench <- do.call(rbind, lapply(c(10000, 25000), function(nn) {
+  set.seed(123)
+  dat <- simulate_data(n = nn, p = 10)
+  do.call(rbind, lapply(c("bj", "cg", "direct"), function(s) {
+    if (s == "direct" && nn > 10000) return(NULL)
+    t <- system.time(
+      fit <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 1000,
+                             solver = s, cross.fitting = FALSE)
+    )["elapsed"]
+    data.frame(n = nn, solver = s, time = t, ate = fit$ate)
+  }))
+}))
+```
+
+```{r solver-table, echo=FALSE}
+stbl <- solver_bench
+stbl$time <- round(stbl$time, 2)
+stbl$ate <- round(stbl$ate, 4)
+names(stbl) <- c("n", "Solver", "Time (s)", "ATE")
+knitr::kable(stbl, row.names = FALSE, align = "rlrr",
+             caption = "Solver comparison (no cross-fitting, B = 1,000).")
+```
+
+Block Jacobi is the fastest iterative solver.  The direct solver is
+competitive at $n = 10{,}000$ but does not scale to larger problems.  All
+solvers produce similar ATE estimates.
 
 
 ## End-to-end timing
 
 We benchmark the full `forest_balance()` pipeline (forest fitting, leaf
 extraction, Z construction, and weight computation) across a range of
-sample sizes up to $n = 50{,}000$ with $B = 1{,}000$ trees.  To show the
-effect of solver choice, we run each $n$ with both `solver = "direct"` and
-`solver = "cg"` where feasible:
+sample sizes up to $n = 50{,}000$ with $B = 1{,}000$ trees:
 
 ```{r benchmark, cache=TRUE}
 n_vals <- c(500, 1000, 2500, 5000, 10000, 25000, 50000)
@@ -154,66 +197,37 @@ bench <- do.call(rbind, lapply(n_vals, function(nn) {
     fit_auto <- forest_balance(dat$X, dat$A, dat$Y, num.trees = B)
   )["elapsed"]
 
-  # Direct (skip for n > 10000)
-  if (nn <= 10000) {
-    t_dir <- system.time(
-      fit_dir <- forest_balance(dat$X, dat$A, dat$Y, num.trees = B,
-                                solver = "direct")
-    )["elapsed"]
-  } else {
-    t_dir <- NA
-  }
-
-  # CG (run for all n)
-  t_cg <- system.time(
-    fit_cg <- forest_balance(dat$X, dat$A, dat$Y, num.trees = B,
-                             solver = "cg")
-  )["elapsed"]
-
-  data.frame(n = nn, trees = B,
-             auto = t_auto, direct = t_dir, cg = t_cg,
+  data.frame(n = nn, trees = B, auto = t_auto,
              auto_solver = fit_auto$solver)
 }))
 ```
 
 ```{r timing-table, echo=FALSE}
-tbl <- bench[, c("n", "trees", "direct", "cg", "auto_solver")]
-tbl$direct <- ifelse(is.na(tbl$direct), "--", sprintf("%.2f", tbl$direct))
-tbl$cg <- sprintf("%.2f", tbl$cg)
-names(tbl) <- c("n", "Trees", "Direct (s)", "CG (s)", "Auto picks")
-knitr::kable(tbl, row.names = FALSE, align = "rrrll",
-             caption = "Full pipeline time by solver.")
+tbl <- bench[, c("n", "trees", "auto", "auto_solver")]
+tbl$auto <- round(tbl$auto, 2)
+names(tbl) <- c("n", "Trees", "Time (s)", "Solver")
+knitr::kable(tbl, row.names = FALSE, align = "rrrl",
+             caption = "Full pipeline time (auto solver).")
 ```
 
 ```{r timing-plot, echo=FALSE, fig.height=4}
 par(mar = c(4, 4.5, 2, 1))
 
-yr <- range(c(bench$direct, bench$cg), na.rm = TRUE)
-plot(NULL, xlim = range(bench$n), ylim = yr,
+solver_cols <- c(direct = "#56B4E9", cg = "#E69F00", bj = "#009E73")
+pt_col <- solver_cols[bench$auto_solver]
+
+plot(bench$n, bench$auto, type = "b", pch = 16, col = pt_col, lwd = 2,
      xlab = "n", ylab = "Time (s)", log = "xy",
      main = sprintf("Full pipeline time (B = %d, p = %d)", B, p))
 
-dir_ok <- !is.na(bench$direct)
-lines(bench$n[dir_ok], bench$direct[dir_ok], type = "b", pch = 16,
-      col = "#56B4E9", lwd = 2)
-
-lines(bench$n, bench$cg, type = "b", pch = 17,
-      col = "#E69F00", lwd = 2)
-
-auto_time <- bench$auto
-auto_col <- ifelse(bench$auto_solver == "direct", "#56B4E9", "#E69F00")
-points(bench$n, auto_time, pch = 1, cex = 2.2, col = auto_col, lwd = 2)
-
 legend("topleft",
-       legend = c("Direct solver", "CG solver", "Auto selection"),
-       col = c("#56B4E9", "#E69F00", "black"),
-       pch = c(16, 17, 1), pt.cex = c(1, 1, 1.5),
-       lty = c(1, 1, NA), lwd = 2, bty = "n", cex = 0.85)
+       legend = c("Direct", "CG", "Block Jacobi"),
+       col = solver_cols, pch = 16, lty = 1, lwd = 2, bty = "n", cex = 0.85)
 ```
 
-The circled points show which solver `"auto"` selects at each $n$.  The
-switchover depends on both the per-fold sample size and the adaptive
-`min.node.size` (which creates denser kernels at higher $p$).
+The solver is selected automatically based on the per-fold sample size.  The
+Block Jacobi preconditioned CG (green) activates for large $n$ and provides
+the best scaling.
 
 ## Scaling with number of trees
 

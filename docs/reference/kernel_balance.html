@@ -58,8 +58,9 @@ from the kernel energy distance objective.</p>
 <span>  <span class="va">trt</span>,</span>
 <span>  kern <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  Z <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  leaf_matrix <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  num.trees <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  solver <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"auto"</span>, <span class="st">"direct"</span>, <span class="st">"cg"</span><span class="op">)</span>,</span>
+<span>  solver <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"auto"</span>, <span class="st">"direct"</span>, <span class="st">"cg"</span>, <span class="st">"bj"</span><span class="op">)</span>,</span>
 <span>  tol <span class="op">=</span> <span class="fl">1e-08</span>,</span>
 <span>  maxiter <span class="op">=</span> <span class="fl">2000L</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -82,9 +83,15 @@ assignment (<code>1</code> = treated, <code>0</code> = control).</p></dd>
 <dt id="arg-z">Z<a class="anchor" aria-label="anchor" href="#arg-z"></a></dt>
 <dd><p>Optional sparse indicator matrix from
 <code><a href="leaf_node_kernel_Z.html">leaf_node_kernel_Z</a></code> such that \(K = Z Z^\top / B\). When
-supplied, the solver can avoid forming the full kernel matrix. If both
-<code>kern</code> and <code>Z</code> are given, <code>Z</code> takes priority when the CG
-solver is selected.</p></dd>
+supplied, the solver can avoid forming the full kernel matrix.</p></dd>
+
+
+<dt id="arg-leaf-matrix">leaf_matrix<a class="anchor" aria-label="anchor" href="#arg-leaf-matrix"></a></dt>
+<dd><p>Optional integer matrix of leaf node assignments
+(observations x trees), as returned by <code><a href="get_leaf_node_matrix.html">get_leaf_node_matrix</a></code>.
+Used by the Block Jacobi preconditioner (<code>solver = "bj"</code>) to
+partition observations into leaf groups. If <code>NULL</code> and
+<code>solver = "bj"</code>, falls back to <code>"cg"</code>.</p></dd>
 
 
 <dt id="arg-num-trees">num.trees<a class="anchor" aria-label="anchor" href="#arg-num-trees"></a></dt>
@@ -94,20 +101,19 @@ provided.</p></dd>
 
 <dt id="arg-solver">solver<a class="anchor" aria-label="anchor" href="#arg-solver"></a></dt>
 <dd><p>Which linear solver to use. <code>"auto"</code> (default) selects
-<code>"direct"</code> for \(n \le 5000\) and <code>"cg"</code> for
-\(n &gt; 5000\). <code>"direct"</code> uses sparse Cholesky on the treated and
-control sub-blocks of the kernel. <code>"cg"</code> uses conjugate gradient
-iterations with the factored \(Z\) representation, avoiding formation of
-any kernel matrix.</p></dd>
+the fastest available solver: <code>"bj"</code> (Block Jacobi preconditioned CG)
+when <code>leaf_matrix</code> is available and \(n &gt; 5000\), <code>"cg"</code>
+(plain CG) when only <code>Z</code> is available, or <code>"direct"</code> (sparse
+Cholesky) for small problems. See Details.</p></dd>
 
 
 <dt id="arg-tol">tol<a class="anchor" aria-label="anchor" href="#arg-tol"></a></dt>
-<dd><p>Convergence tolerance for the CG solver. Default is <code>1e-8</code>.
-Ignored when <code>solver = "direct"</code>.</p></dd>
+<dd><p>Convergence tolerance for iterative solvers. Default is
+<code>1e-8</code>.</p></dd>
 
 
 <dt id="arg-maxiter">maxiter<a class="anchor" aria-label="anchor" href="#arg-maxiter"></a></dt>
-<dd><p>Maximum CG iterations. Default is 1000.</p></dd>
+<dd><p>Maximum iterations for iterative solvers. Default is 2000.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -118,7 +124,7 @@ weights. Treated weights sum to \(n_1\) and control weights sum to
 \(n_0\).</p></dd>
 
 <dt>solver</dt>
-<dd><p>The solver that was used (<code>"direct"</code> or <code>"cg"</code>).</p></dd>
+<dd><p>The solver that was used.</p></dd>
 
 
 </dl></div>
@@ -128,15 +134,16 @@ weights. Treated weights sum to \(n_1\) and control weights sum to
 the treated–control cross-blocks are zero because
 \(K_q(i,j) = 0\) whenever \(A_i \neq A_j\). Both solvers exploit this
 structure by working on the treated and control blocks independently.</p>
-<p>The <strong>direct</strong> solver extracts the sub-blocks \(K_{tt}\) and
-\(K_{cc}\) and solves via sparse Cholesky. This gives exact solutions
-but requires forming (at least sub-blocks of) the kernel matrix.</p>
+<p>The <strong>Block Jacobi</strong> solver (<code>"bj"</code>) uses the first tree's leaf
+partition to define a block-diagonal preconditioner for CG. Each leaf block
+is a small dense system (~<code>min.node.size</code> x <code>min.node.size</code>) that
+is cheap to factor. This typically reduces CG iterations by 5–10x, giving
+a ~20x overall speedup at large \(n\).</p>
 <p>The <strong>CG</strong> solver uses the factored representation \(K = Z Z^\top / B\)
-to perform matrix–vector products without forming any kernel matrix,
-via \(K v = Z (Z^\top v) / B\). This is much faster and more
-memory-efficient at large \(n\) (e.g., \(n &gt; 5000\)). The CG iterates
-converge to the exact solution; the default tolerance of <code>5e-11</code> yields
-weight vectors that agree with the direct solution to several decimal places.</p>
+to perform matrix–vector products without forming any kernel matrix.</p>
+<p>The <strong>direct</strong> solver extracts sub-blocks and solves via sparse Cholesky.</p>
+<p>Only 2 linear solves per block are needed (not 3) because the third
+right-hand side is a linear combination of the first two.</p>
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>

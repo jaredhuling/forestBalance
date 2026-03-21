@@ -106,11 +106,12 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
     stop("'num.trees' is required when 'Z' is provided.")
   }
 
-  # Choose solver adaptively
+  # Choose solver adaptively.
+  # CG (Rcpp) is the robust default for large problems. Block Jacobi can be
+  # faster in narrow regimes (moderate min.node.size, many trees) but is
+  # slower when blocks are large, so it is available as an explicit option.
   if (solver == "auto") {
-    if (!is.null(Z) && !is.null(leaf_matrix) && n > 5000) {
-      solver <- "bj"
-    } else if (!is.null(Z) && n > 5000) {
+    if (!is.null(Z) && n > 5000) {
       solver <- "cg"
     } else {
       solver <- "direct"

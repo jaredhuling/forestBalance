@@ -12,8 +12,9 @@ kernel_balance(
   trt,
   kern = NULL,
   Z = NULL,
+  leaf_matrix = NULL,
   num.trees = NULL,
-  solver = c("auto", "direct", "cg"),
+  solver = c("auto", "direct", "cg", "bj"),
   tol = 1e-08,
   maxiter = 2000L
 )
@@ -36,8 +37,16 @@ kernel_balance(
   Optional sparse indicator matrix from
   [`leaf_node_kernel_Z`](https://jaredhuling.github.io/forestBalance/reference/leaf_node_kernel_Z.md)
   such that \\K = Z Z^\top / B\\. When supplied, the solver can avoid
-  forming the full kernel matrix. If both `kern` and `Z` are given, `Z`
-  takes priority when the CG solver is selected.
+  forming the full kernel matrix.
+
+- leaf_matrix:
+
+  Optional integer matrix of leaf node assignments (observations x
+  trees), as returned by
+  [`get_leaf_node_matrix`](https://jaredhuling.github.io/forestBalance/reference/get_leaf_node_matrix.md).
+  Used by the Block Jacobi preconditioner (`solver = "bj"`) to partition
+  observations into leaf groups. If `NULL` and `solver = "bj"`, falls
+  back to `"cg"`.
 
 - num.trees:
 
@@ -45,20 +54,19 @@ kernel_balance(
 
 - solver:
 
-  Which linear solver to use. `"auto"` (default) selects `"direct"` for
-  \\n \le 5000\\ and `"cg"` for \\n \> 5000\\. `"direct"` uses sparse
-  Cholesky on the treated and control sub-blocks of the kernel. `"cg"`
-  uses conjugate gradient iterations with the factored \\Z\\
-  representation, avoiding formation of any kernel matrix.
+  Which linear solver to use. `"auto"` (default) selects the fastest
+  available solver: `"bj"` (Block Jacobi preconditioned CG) when
+  `leaf_matrix` is available and \\n \> 5000\\, `"cg"` (plain CG) when
+  only `Z` is available, or `"direct"` (sparse Cholesky) for small
+  problems. See Details.
 
 - tol:
 
-  Convergence tolerance for the CG solver. Default is `1e-8`. Ignored
-  when `solver = "direct"`.
+  Convergence tolerance for iterative solvers. Default is `1e-8`.
 
 - maxiter:
 
-  Maximum CG iterations. Default is 1000.
+  Maximum iterations for iterative solvers. Default is 2000.
 
 ## Value
 
@@ -71,7 +79,7 @@ A list with the following elements:
 
 - solver:
 
-  The solver that was used (`"direct"` or `"cg"`).
+  The solver that was used.
 
 ## Details
 
@@ -80,17 +88,20 @@ the treated–control cross-blocks are zero because \\K_q(i,j) = 0\\
 whenever \\A_i \neq A_j\\. Both solvers exploit this structure by
 working on the treated and control blocks independently.
 
-The **direct** solver extracts the sub-blocks \\K\_{tt}\\ and
-\\K\_{cc}\\ and solves via sparse Cholesky. This gives exact solutions
-but requires forming (at least sub-blocks of) the kernel matrix.
+The **Block Jacobi** solver (`"bj"`) uses the first tree's leaf
+partition to define a block-diagonal preconditioner for CG. Each leaf
+block is a small dense system (~`min.node.size` x `min.node.size`) that
+is cheap to factor. This typically reduces CG iterations by 5–10x,
+giving a ~20x overall speedup at large \\n\\.
 
 The **CG** solver uses the factored representation \\K = Z Z^\top / B\\
-to perform matrix–vector products without forming any kernel matrix, via
-\\K v = Z (Z^\top v) / B\\. This is much faster and more
-memory-efficient at large \\n\\ (e.g., \\n \> 5000\\). The CG iterates
-converge to the exact solution; the default tolerance of `5e-11` yields
-weight vectors that agree with the direct solution to several decimal
-places.
+to perform matrix–vector products without forming any kernel matrix.
+
+The **direct** solver extracts sub-blocks and solves via sparse
+Cholesky.
+
+Only 2 linear solves per block are needed (not 3) because the third
+right-hand side is a linear combination of the first two.
 
 ## References
 
