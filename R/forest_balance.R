@@ -159,7 +159,7 @@ forest_balance <- function(X, A, Y,
                            augmented = FALSE,
                            mu.hat = NULL,
                            scale.outcomes = TRUE,
-                           solver = c("auto", "direct", "cg"),
+                           solver = c("auto", "direct", "cg", "bj"),
                            tol = 1e-8,
                            parallel = FALSE,
                            ...) {
@@ -242,7 +242,9 @@ forest_balance <- function(X, A, Y,
 #' @noRd
 .choose_solver <- function(solver, n_obs, min.node.size) {
   if (solver != "auto") return(solver)
-  if (n_obs > 5000 || min.node.size > n_obs / 20) "cg" else "direct"
+  if (n_obs > 5000) "bj"
+  else if (min.node.size > n_obs / 20) "cg"
+  else "direct"
 }
 
 
@@ -267,10 +269,11 @@ forest_balance <- function(X, A, Y,
   n_pred <- nrow(X_pred)
   eff_solver <- .choose_solver(solver, n_pred, min.node.size)
 
-  if (eff_solver == "cg") {
+  if (eff_solver %in% c("bj", "cg")) {
     Z <- leaf_node_kernel_Z(leaf_mat)
-    bal <- kernel_balance(trt = A_pred, Z = Z, num.trees = num.trees,
-                          solver = "cg", tol = tol)
+    bal <- kernel_balance(trt = A_pred, Z = Z, leaf_matrix = leaf_mat,
+                          num.trees = num.trees,
+                          solver = eff_solver, tol = tol)
     K <- NULL
   } else {
     K <- leaf_node_kernel(leaf_mat)

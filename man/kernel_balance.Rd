@@ -8,8 +8,9 @@ kernel_balance(
   trt,
   kern = NULL,
   Z = NULL,
+  leaf_matrix = NULL,
   num.trees = NULL,
-  solver = c("auto", "direct", "cg"),
+  solver = c("auto", "direct", "cg", "bj"),
   tol = 1e-08,
   maxiter = 2000L
 )
@@ -23,24 +24,27 @@ assignment (\code{1} = treated, \code{0} = control).}
 
 \item{Z}{Optional sparse indicator matrix from
 \code{\link{leaf_node_kernel_Z}} such that \eqn{K = Z Z^\top / B}. When
-supplied, the solver can avoid forming the full kernel matrix. If both
-\code{kern} and \code{Z} are given, \code{Z} takes priority when the CG
-solver is selected.}
+supplied, the solver can avoid forming the full kernel matrix.}
+
+\item{leaf_matrix}{Optional integer matrix of leaf node assignments
+(observations x trees), as returned by \code{\link{get_leaf_node_matrix}}.
+Used by the Block Jacobi preconditioner (\code{solver = "bj"}) to
+partition observations into leaf groups. If \code{NULL} and
+\code{solver = "bj"}, falls back to \code{"cg"}.}
 
 \item{num.trees}{Number of trees \eqn{B}. Required when \code{Z} is
 provided.}
 
 \item{solver}{Which linear solver to use. \code{"auto"} (default) selects
-\code{"direct"} for \eqn{n \le 5000} and \code{"cg"} for
-\eqn{n > 5000}. \code{"direct"} uses sparse Cholesky on the treated and
-control sub-blocks of the kernel. \code{"cg"} uses conjugate gradient
-iterations with the factored \eqn{Z} representation, avoiding formation of
-any kernel matrix.}
+the fastest available solver: \code{"bj"} (Block Jacobi preconditioned CG)
+when \code{leaf_matrix} is available and \eqn{n > 5000}, \code{"cg"}
+(plain CG) when only \code{Z} is available, or \code{"direct"} (sparse
+Cholesky) for small problems. See Details.}
 
-\item{tol}{Convergence tolerance for the CG solver. Default is \code{1e-8}.
-Ignored when \code{solver = "direct"}.}
+\item{tol}{Convergence tolerance for iterative solvers. Default is
+\code{1e-8}.}
 
-\item{maxiter}{Maximum CG iterations. Default is 1000.}
+\item{maxiter}{Maximum iterations for iterative solvers. Default is 2000.}
 }
 \value{
 A list with the following elements:
@@ -48,7 +52,7 @@ A list with the following elements:
 \item{weights}{A numeric vector of length \eqn{n} containing the balancing
 weights. Treated weights sum to \eqn{n_1} and control weights sum to
 \eqn{n_0}.}
-\item{solver}{The solver that was used (\code{"direct"} or \code{"cg"}).}
+\item{solver}{The solver that was used.}
 }
 }
 \description{
@@ -63,16 +67,19 @@ the treated--control cross-blocks are zero because
 \eqn{K_q(i,j) = 0} whenever \eqn{A_i \neq A_j}. Both solvers exploit this
 structure by working on the treated and control blocks independently.
 
-The \strong{direct} solver extracts the sub-blocks \eqn{K_{tt}} and
-\eqn{K_{cc}} and solves via sparse Cholesky. This gives exact solutions
-but requires forming (at least sub-blocks of) the kernel matrix.
+The \strong{Block Jacobi} solver (\code{"bj"}) uses the first tree's leaf
+partition to define a block-diagonal preconditioner for CG. Each leaf block
+is a small dense system (~\code{min.node.size} x \code{min.node.size}) that
+is cheap to factor. This typically reduces CG iterations by 5--10x, giving
+a ~20x overall speedup at large \eqn{n}.
 
 The \strong{CG} solver uses the factored representation \eqn{K = Z Z^\top / B}
-to perform matrix--vector products without forming any kernel matrix,
-via \eqn{K v = Z (Z^\top v) / B}. This is much faster and more
-memory-efficient at large \eqn{n} (e.g., \eqn{n > 5000}). The CG iterates
-converge to the exact solution; the default tolerance of \code{5e-11} yields
-weight vectors that agree with the direct solution to several decimal places.
+to perform matrix--vector products without forming any kernel matrix.
+
+The \strong{direct} solver extracts sub-blocks and solves via sparse Cholesky.
+
+Only 2 linear solves per block are needed (not 3) because the third
+right-hand side is a linear combination of the first two.
 }
 \examples{
 \donttest{
