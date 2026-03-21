@@ -75,6 +75,7 @@
 #'        weighted.mean(Y[A == 0], w[A == 0])
 #' }
 #'
+#' @importFrom methods as
 #' @importFrom Matrix Matrix rowSums forceSymmetric sparseMatrix colSums
 #' @importFrom Matrix crossprod tcrossprod
 #' @importMethodsFrom Matrix solve
@@ -125,9 +126,11 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, num.trees = NULL,
     Z_t <- Z[idx_t, ]
     Z_c <- Z[idx_c, ]
 
-    # CG helpers: solve Z_g Z_g^T x = B * rhs  for group g
-    cg_t <- function(rhs) .cg_solve(Z_t, B * rhs, tol, maxiter)
-    cg_c <- function(rhs) .cg_solve(Z_c, B * rhs, tol, maxiter)
+    # CG helpers: solve Z_g Z_g^T x = B * rhs  for group g (C++ solver)
+    Z_t_csc <- as(Z_t, "dgCMatrix")
+    Z_c_csc <- as(Z_c, "dgCMatrix")
+    cg_t <- function(rhs) as.numeric(cg_solve_cpp(Z_t_csc, B * rhs, tol, maxiter))
+    cg_c <- function(rhs) as.numeric(cg_solve_cpp(Z_c_csc, B * rhs, tol, maxiter))
 
     # Treated block: only 2 solves needed.
     # The 3rd RHS z_t = b_t - c*1 is a linear combination, so
@@ -184,25 +187,8 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, num.trees = NULL,
 }
 
 
-# CG solver: solve A A^T x = rhs via conjugate gradient
-# where mat-vec is v -> A %*% (A^T %*% v)
-.cg_solve <- function(A, rhs, tol = 1e-8, maxiter = 2000L) {
-  Kv <- function(v) as.numeric(A %*% Matrix::crossprod(A, v))
-  x <- numeric(length(rhs))
-  r <- rhs - Kv(x)
-  p <- r
-  rs <- sum(r * r)
 
-  for (i in seq_len(maxiter)) {
-    Ap <- Kv(p)
-    alpha <- rs / sum(p * Ap)
-    x <- x + alpha * p
-    r <- r - alpha * Ap
-    rsnew <- sum(r * r)
-    if (sqrt(rsnew) < tol) break
-    p <- r + (rsnew / rs) * p
-    rs <- rsnew
-  }
-
-  x
-}
+# Note: CG solver is now implemented in C++ (src/cg_solve.cpp) as cg_solve_cpp().
+# The C++ implementation uses Eigen sparse mat-vecs with a compiled loop,
+# giving ~2x speedup over the equivalent R loop by eliminating interpreter
+# overhead, temporary vector allocations, and garbage collection.
