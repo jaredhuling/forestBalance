@@ -22,7 +22,7 @@
 #'   control sub-blocks of the kernel. \code{"cg"} uses conjugate gradient
 #'   iterations with the factored \eqn{Z} representation, avoiding formation of
 #'   any kernel matrix.
-#' @param tol Convergence tolerance for the CG solver. Default is \code{5e-11}.
+#' @param tol Convergence tolerance for the CG solver. Default is \code{1e-8}.
 #'   Ignored when \code{solver = "direct"}.
 #' @param maxiter Maximum CG iterations. Default is 1000.
 #'
@@ -81,7 +81,7 @@
 #' @export
 kernel_balance <- function(trt, kern = NULL, Z = NULL, num.trees = NULL,
                            solver = c("auto", "direct", "cg"),
-                           tol = 5e-11, maxiter = 1000L) {
+                           tol = 1e-8, maxiter = 2000L) {
   solver <- match.arg(solver)
 
   trt <- as.double(trt)
@@ -183,7 +183,7 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, num.trees = NULL,
 
 # CG solver: solve A A^T x = rhs via conjugate gradient
 # where mat-vec is v -> A %*% (A^T %*% v)
-.cg_solve <- function(A, rhs, tol = 5e-11, maxiter = 1000L) {
+.cg_solve <- function(A, rhs, tol = 1e-8, maxiter = 2000L) {
   Kv <- function(v) as.numeric(A %*% Matrix::crossprod(A, v))
   x <- numeric(length(rhs))
   r <- rhs - Kv(x)

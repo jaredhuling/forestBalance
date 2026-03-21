@@ -160,7 +160,7 @@ forest_balance <- function(X, A, Y,
                            mu.hat = NULL,
                            scale.outcomes = TRUE,
                            solver = c("auto", "direct", "cg"),
-                           tol = 5e-11,
+                           tol = 1e-8,
                            parallel = FALSE,
                            ...) {
   solver <- match.arg(solver)

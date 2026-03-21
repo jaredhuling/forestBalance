@@ -16,7 +16,7 @@ forest_balance(
   mu.hat = NULL,
   scale.outcomes = TRUE,
   solver = c("auto", "direct", "cg"),
-  tol = 5e-11,
+  tol = 1e-08,
   parallel = FALSE,
   ...
 )

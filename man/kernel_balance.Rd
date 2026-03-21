@@ -10,8 +10,8 @@ kernel_balance(
   Z = NULL,
   num.trees = NULL,
   solver = c("auto", "direct", "cg"),
-  tol = 5e-11,
-  maxiter = 1000L
+  tol = 1e-08,
+  maxiter = 2000L
 )
 }
 \arguments{
@@ -37,7 +37,7 @@ control sub-blocks of the kernel. \code{"cg"} uses conjugate gradient
 iterations with the factored \eqn{Z} representation, avoiding formation of
 any kernel matrix.}
 
-\item{tol}{Convergence tolerance for the CG solver. Default is \code{5e-11}.
+\item{tol}{Convergence tolerance for the CG solver. Default is \code{1e-8}.
 Ignored when \code{solver = "direct"}.}
 
 \item{maxiter}{Maximum CG iterations. Default is 1000.}
