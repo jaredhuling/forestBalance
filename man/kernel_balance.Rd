@@ -104,12 +104,26 @@ X <- matrix(rnorm(n * p), n, p)
 A <- rbinom(n, 1, plogis(X[, 1]))
 Y <- X[, 1] + rnorm(n)
 
+# --- Direct solver (using the kernel matrix) ---
 forest <- multi_regression_forest(X, cbind(A, Y), num.trees = 500)
 K <- forest_kernel(forest)
-bal <- kernel_balance(A, K)
+bal_direct <- kernel_balance(A, kern = K, solver = "direct")
+
+# --- CG solver (using the Z matrix, avoids forming K) ---
+# Step 1: extract leaf node assignments (n x B matrix)
+leaf_mat <- get_leaf_node_matrix(forest, X)
+
+# Step 2: build sparse indicator matrix Z such that K = Z Z' / B
+Z <- leaf_node_kernel_Z(leaf_mat)
+
+# Step 3: solve with CG (matrix-free, no kernel formed)
+bal_cg <- kernel_balance(A, Z = Z, num.trees = 500, solver = "cg")
+
+# Both solvers give the same weights
+max(abs(bal_direct$weights - bal_cg$weights))
 
 # Weighted ATE estimate
-w <- bal$weights
+w <- bal_cg$weights
 ate <- weighted.mean(Y[A == 1], w[A == 1]) -
        weighted.mean(Y[A == 0], w[A == 0])
 }
