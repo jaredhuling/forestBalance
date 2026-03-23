@@ -8,22 +8,26 @@
 #' @param trt A binary (0/1) integer or numeric vector indicating treatment
 #'   assignment (\code{1} = treated, \code{0} = control).
 #' @param kern A symmetric \eqn{n \times n} kernel matrix (dense or sparse), or
-#'   \code{NULL} if \code{Z} is provided.
+#'   \code{NULL} if \code{Z} is provided. Required for \code{solver = "direct"}
+#'   (if not provided but \code{Z} is available, the kernel is formed
+#'   automatically, though this is \eqn{O(n^2)} and may be slow for large
+#'   \eqn{n}).
 #' @param Z Optional sparse indicator matrix from
 #'   \code{\link{leaf_node_kernel_Z}} such that \eqn{K = Z Z^\top / B}. When
-#'   supplied, the solver can avoid forming the full kernel matrix.
+#'   supplied, the iterative solvers (\code{"cg"}, \code{"bj"}) can perform
+#'   matrix-free products without forming the full kernel. Required for
+#'   \code{solver = "cg"} and \code{solver = "bj"}.
 #' @param leaf_matrix Optional integer matrix of leaf node assignments
 #'   (observations x trees), as returned by \code{\link{get_leaf_node_matrix}}.
-#'   Used by the Block Jacobi preconditioner (\code{solver = "bj"}) to
-#'   partition observations into leaf groups. If \code{NULL} and
-#'   \code{solver = "bj"}, falls back to \code{"cg"}.
+#'   Required for \code{solver = "bj"} (Block Jacobi preconditioner uses
+#'   tree 1's leaf partition). If \code{NULL} and \code{solver = "bj"}, falls
+#'   back to \code{"cg"} with a warning.
 #' @param num.trees Number of trees \eqn{B}. Required when \code{Z} is
 #'   provided.
 #' @param solver Which linear solver to use. \code{"auto"} (default) selects
-#'   the fastest available solver: \code{"bj"} (Block Jacobi preconditioned CG)
-#'   when \code{leaf_matrix} is available and \eqn{n > 5000}, \code{"cg"}
-#'   (plain CG) when only \code{Z} is available, or \code{"direct"} (sparse
-#'   Cholesky) for small problems. See Details.
+#'   the best available solver based on the inputs: \code{"cg"} when \code{Z}
+#'   is available and \eqn{n > 5000}, or \code{"direct"} otherwise. See
+#'   Details for solver requirements.
 #' @param tol Convergence tolerance for iterative solvers. Default is
 #'   \code{1e-8}.
 #' @param maxiter Maximum iterations for iterative solvers. Default is 2000.
@@ -39,19 +43,29 @@
 #' @details
 #' The modified kernel \eqn{K_q} used in the optimization is block-diagonal:
 #' the treated--control cross-blocks are zero because
-#' \eqn{K_q(i,j) = 0} whenever \eqn{A_i \neq A_j}. Both solvers exploit this
+#' \eqn{K_q(i,j) = 0} whenever \eqn{A_i \neq A_j}. All solvers exploit this
 #' structure by working on the treated and control blocks independently.
 #'
-#' The \strong{Block Jacobi} solver (\code{"bj"}) uses the first tree's leaf
-#' partition to define a block-diagonal preconditioner for CG. Each leaf block
-#' is a small dense system (~\code{min.node.size} x \code{min.node.size}) that
-#' is cheap to factor. This typically reduces CG iterations by 5--10x, giving
-#' a ~20x overall speedup at large \eqn{n}.
+#' \strong{Solver requirements:}
+#' \tabular{lll}{
+#'   Solver \tab Required inputs \tab Optional inputs \cr
+#'   \code{"direct"} \tab \code{kern} (or \code{Z} + \code{num.trees}) \tab \cr
+#'   \code{"cg"} \tab \code{Z} + \code{num.trees} \tab \cr
+#'   \code{"bj"} \tab \code{Z} + \code{num.trees} + \code{leaf_matrix}
+#'     \tab (falls back to \code{"cg"} if \code{leaf_matrix} is missing)
+#' }
+#'
+#' The \strong{direct} solver extracts sub-blocks of the kernel and solves via
+#' sparse Cholesky. If only \code{Z} is provided, the kernel is formed as
+#' \eqn{K = Z Z^\top / B}, which requires \eqn{O(n^2)} time and memory.
 #'
 #' The \strong{CG} solver uses the factored representation \eqn{K = Z Z^\top / B}
 #' to perform matrix--vector products without forming any kernel matrix.
 #'
-#' The \strong{direct} solver extracts sub-blocks and solves via sparse Cholesky.
+#' The \strong{Block Jacobi} solver (\code{"bj"}) uses the first tree's leaf
+#' partition (from \code{leaf_matrix}) to define a block-diagonal
+#' preconditioner for CG. Each leaf block is a small dense system that is
+#' cheap to factor.
 #'
 #' Only 2 linear solves per block are needed (not 3) because the third
 #' right-hand side is a linear combination of the first two.
@@ -106,10 +120,7 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
     stop("'num.trees' is required when 'Z' is provided.")
   }
 
-  # Choose solver adaptively.
-  # CG (Rcpp) is the robust default for large problems. Block Jacobi can be
-  # faster in narrow regimes (moderate min.node.size, many trees) but is
-  # slower when blocks are large, so it is available as an explicit option.
+  # Choose solver adaptively based on available inputs.
   if (solver == "auto") {
     if (!is.null(Z) && n > 5000) {
       solver <- "cg"
@@ -117,10 +128,20 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
       solver <- "direct"
     }
   }
-  # Fall back from bj to cg if leaf_matrix not available
-  if (solver == "bj" && is.null(leaf_matrix)) solver <- "cg"
-  if (solver %in% c("bj", "cg") && is.null(Z)) {
-    stop("CG/BJ solvers require the Z matrix.")
+
+  # Validate solver/input compatibility
+  if (solver %in% c("cg", "bj") && is.null(Z)) {
+    stop("solver = \"", solver, "\" requires the 'Z' matrix ",
+         "(sparse indicator from leaf_node_kernel_Z). ",
+         "Use solver = \"direct\" with 'kern', or provide 'Z'.")
+  }
+  if (solver == "bj" && is.null(leaf_matrix)) {
+    warning("solver = \"bj\" requires 'leaf_matrix' for the block Jacobi ",
+            "preconditioner. Falling back to solver = \"cg\".")
+    solver <- "cg"
+  }
+  if (solver == "direct" && is.null(kern) && is.null(Z)) {
+    stop("solver = \"direct\" requires either 'kern' or 'Z' + 'num.trees'.")
   }
 
   idx_t <- which(trt == 1)

@@ -30,23 +30,26 @@ kernel_balance(
 - kern:
 
   A symmetric \\n \times n\\ kernel matrix (dense or sparse), or `NULL`
-  if `Z` is provided.
+  if `Z` is provided. Required for `solver = "direct"` (if not provided
+  but `Z` is available, the kernel is formed automatically, though this
+  is \\O(n^2)\\ and may be slow for large \\n\\).
 
 - Z:
 
   Optional sparse indicator matrix from
   [`leaf_node_kernel_Z`](https://jaredhuling.github.io/forestBalance/reference/leaf_node_kernel_Z.md)
-  such that \\K = Z Z^\top / B\\. When supplied, the solver can avoid
-  forming the full kernel matrix.
+  such that \\K = Z Z^\top / B\\. When supplied, the iterative solvers
+  (`"cg"`, `"bj"`) can perform matrix-free products without forming the
+  full kernel. Required for `solver = "cg"` and `solver = "bj"`.
 
 - leaf_matrix:
 
   Optional integer matrix of leaf node assignments (observations x
   trees), as returned by
   [`get_leaf_node_matrix`](https://jaredhuling.github.io/forestBalance/reference/get_leaf_node_matrix.md).
-  Used by the Block Jacobi preconditioner (`solver = "bj"`) to partition
-  observations into leaf groups. If `NULL` and `solver = "bj"`, falls
-  back to `"cg"`.
+  Required for `solver = "bj"` (Block Jacobi preconditioner uses tree
+  1's leaf partition). If `NULL` and `solver = "bj"`, falls back to
+  `"cg"` with a warning.
 
 - num.trees:
 
@@ -54,11 +57,10 @@ kernel_balance(
 
 - solver:
 
-  Which linear solver to use. `"auto"` (default) selects the fastest
-  available solver: `"bj"` (Block Jacobi preconditioned CG) when
-  `leaf_matrix` is available and \\n \> 5000\\, `"cg"` (plain CG) when
-  only `Z` is available, or `"direct"` (sparse Cholesky) for small
-  problems. See Details.
+  Which linear solver to use. `"auto"` (default) selects the best
+  available solver based on the inputs: `"cg"` when `Z` is available and
+  \\n \> 5000\\, or `"direct"` otherwise. See Details for solver
+  requirements.
 
 - tol:
 
@@ -85,20 +87,28 @@ A list with the following elements:
 
 The modified kernel \\K_q\\ used in the optimization is block-diagonal:
 the treated–control cross-blocks are zero because \\K_q(i,j) = 0\\
-whenever \\A_i \neq A_j\\. Both solvers exploit this structure by
-working on the treated and control blocks independently.
+whenever \\A_i \neq A_j\\. All solvers exploit this structure by working
+on the treated and control blocks independently.
 
-The **Block Jacobi** solver (`"bj"`) uses the first tree's leaf
-partition to define a block-diagonal preconditioner for CG. Each leaf
-block is a small dense system (~`min.node.size` x `min.node.size`) that
-is cheap to factor. This typically reduces CG iterations by 5–10x,
-giving a ~20x overall speedup at large \\n\\.
+**Solver requirements:**
+
+|  |  |  |
+|----|----|----|
+| Solver | Required inputs | Optional inputs |
+| `"direct"` | `kern` (or `Z` + `num.trees`) |  |
+| `"cg"` | `Z` + `num.trees` |  |
+| `"bj"` | `Z` + `num.trees` + `leaf_matrix` | (falls back to `"cg"` if `leaf_matrix` is missing) |
+
+The **direct** solver extracts sub-blocks of the kernel and solves via
+sparse Cholesky. If only `Z` is provided, the kernel is formed as \\K =
+Z Z^\top / B\\, which requires \\O(n^2)\\ time and memory.
 
 The **CG** solver uses the factored representation \\K = Z Z^\top / B\\
 to perform matrix–vector products without forming any kernel matrix.
 
-The **direct** solver extracts sub-blocks and solves via sparse
-Cholesky.
+The **Block Jacobi** solver (`"bj"`) uses the first tree's leaf
+partition (from `leaf_matrix`) to define a block-diagonal preconditioner
+for CG. Each leaf block is a small dense system that is cheap to factor.
 
 Only 2 linear solves per block are needed (not 3) because the third
 right-hand side is a linear combination of the first two.
