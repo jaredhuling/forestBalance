@@ -12,3 +12,4 @@
 ^vignettes/cache$
 ^vignettes/precompile\.R$
 ^vignettes/.*\.Rmd\.orig$
+.gitattributes
