@@ -23,7 +23,7 @@ on:
 jobs:
 
   rhub:
-    uses: r-hub/actions/run-check@v1
+    uses: r-hub/actions/.github/workflows/rhub-check.yaml@v1
     with:
       config: ${{ github.event.inputs.config }}
       name: ${{ github.event.inputs.name }}
