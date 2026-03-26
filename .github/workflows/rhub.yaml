@@ -15,6 +15,10 @@ on:
         description: 'Run name. You can leave this empty.'
         type: string
         required: false
+      id:
+        description: 'Unique ID for the check run.'
+        type: string
+        required: false
 
 jobs:
 
