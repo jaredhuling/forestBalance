@@ -1,6 +1,7 @@
 ## First upload for 'forestBalance' -- 0.1.0
 
 * New package upload
+* fixes pragma issue and other CRAN issues found
 
 ## Test environments
 

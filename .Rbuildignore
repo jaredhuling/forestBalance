@@ -16,3 +16,6 @@
 ^vignettes/precompile\.R$
 ^vignettes/.*\.Rmd\.orig$
 .gitattributes
+^_pkgdown\.yml$
+^docs$
+^figure$
