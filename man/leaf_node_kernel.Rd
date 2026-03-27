@@ -12,7 +12,7 @@ leaf_node_kernel(leaf_matrix, sparse = TRUE)
 tree \code{b}. Typically produced by \code{\link{get_leaf_node_matrix}}.}
 
 \item{sparse}{Logical; if \code{TRUE} (default), returns a sparse
-\code{\linkS4class[Matrix]{dgCMatrix}} from the \pkg{Matrix} package. If
+\code{\link[Matrix:dgCMatrix-class]{dgCMatrix}} from the \pkg{Matrix} package. If
 \code{FALSE}, returns a dense base R matrix.}
 }
 \value{

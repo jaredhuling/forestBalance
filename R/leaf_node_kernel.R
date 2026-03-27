@@ -8,7 +8,7 @@
 #'   \code{leaf_matrix[i, b]} is the leaf node ID for observation \code{i} in
 #'   tree \code{b}. Typically produced by \code{\link{get_leaf_node_matrix}}.
 #' @param sparse Logical; if \code{TRUE} (default), returns a sparse
-#'   \code{\linkS4class[Matrix]{dgCMatrix}} from the \pkg{Matrix} package. If
+#'   \code{\link[Matrix:dgCMatrix-class]{dgCMatrix}} from the \pkg{Matrix} package. If
 #'   \code{FALSE}, returns a dense base R matrix.
 #'
 #' @return A symmetric \eqn{n \times n} matrix (sparse or dense depending on
