@@ -7,13 +7,7 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(
-  echo = TRUE, message = FALSE, warning = FALSE,
-  fig.width = 6.5, fig.height = 4, collapse = TRUE, comment = "#>"
-)
-library(forestBalance)
-```
+
 
 ## Overview
 
@@ -52,7 +46,8 @@ RMSE than either approach alone.
 
 Enable augmentation with `augmented = TRUE`:
 
-```{r basic}
+
+``` r
 set.seed(123)
 dat <- simulate_data(n = 2000, p = 20, ate = 0, dgp = 2)
 
@@ -64,12 +59,27 @@ fit_aug <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 500,
                            augmented = TRUE)
 
 c("Standard" = fit$ate, "Augmented" = fit_aug$ate, "Truth" = 0)
+#>   Standard  Augmented      Truth 
+#> 0.01664814 0.06350369 0.00000000
 ```
 
 The `print` method indicates when augmentation is active:
 
-```{r print}
+
+``` r
 fit_aug
+#> Forest Kernel Energy Balancing (cross-fitted)
+#> -------------------------------------------------- 
+#>   n = 2,000  (n_treated = 1042, n_control = 958)
+#>   Trees: 500
+#>   Cross-fitting: 2 folds
+#>   Augmented: yes (doubly-robust)
+#>   Solver: direct
+#>   ATE estimate: 0.0635
+#>   Fold ATEs: 0.0898, 0.0372
+#>   ESS: treated = 795/1042 (76%)   control = 712/958 (74%)
+#> -------------------------------------------------- 
+#> Use summary() for covariate balance details.
 ```
 
 ## How it works with cross-fitting
@@ -96,7 +106,8 @@ $\hat\mu_1$ and $\hat\mu_0$ separately --- it is handled automatically.
 We compare four configurations using DGP 2, which has a rich outcome surface
 with moderate confounding ($n = 5{,}000$, $p = 20$):
 
-```{r simulation, cache=TRUE}
+
+``` r
 set.seed(123)
 nreps <- 5
 n <- 5000; p <- 20
@@ -121,17 +132,18 @@ for (r in seq_len(nreps)) {
 }
 ```
 
-```{r sim-table, echo=FALSE}
-stbl <- data.frame(
-  Method = colnames(res),
-  Bias = round(colMeans(res), 4),
-  SD = round(apply(res, 2, sd), 4),
-  RMSE = round(sqrt(colMeans(res)^2 + apply(res, 2, var)), 4)
-)
-knitr::kable(stbl, row.names = FALSE,
-             caption = sprintf("DGP 2: n = %s, p = %d, true ATE = 0, %d reps.",
-                               format(n, big.mark = ","), p, nreps))
-```
+
+
+Table: DGP 2: n = 5,000, p = 20, true ATE = 0, 5 reps.
+
+|Method   |   Bias|     SD|   RMSE|
+|:--------|------:|------:|------:|
+|Standard | 0.1204| 0.0437| 0.1281|
+|CF only  | 0.0151| 0.0673| 0.0690|
+|Aug only | 0.0515| 0.0535| 0.0743|
+|CF + Aug | 0.0055| 0.0609| 0.0611|
+
+
 
 The combination of cross-fitting and augmentation (CF + Aug) achieves the
 lowest bias.  Cross-fitting alone handles the kernel overfitting, while
@@ -145,7 +157,8 @@ You can supply your own group-specific outcome predictions via `mu.hat` as a
 list with components `mu1` (predictions of $E[Y|X, A{=}1]$) and `mu0`
 (predictions of $E[Y|X, A{=}0]$):
 
-```{r user-muhat}
+
+``` r
 set.seed(123)
 dat <- simulate_data(n = 1000, p = 20, ate = 0, dgp = 2)
 
@@ -163,6 +176,18 @@ mu_custom <- list(
 fit_custom <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 500,
                               mu.hat = mu_custom)
 fit_custom
+#> Forest Kernel Energy Balancing (cross-fitted)
+#> -------------------------------------------------- 
+#>   n = 1,000  (n_treated = 505, n_control = 495)
+#>   Trees: 500
+#>   Cross-fitting: 2 folds
+#>   Augmented: yes (doubly-robust)
+#>   Solver: direct
+#>   ATE estimate: 0.1576
+#>   Fold ATEs: 0.2724, 0.0428
+#>   ESS: treated = 391/505 (77%)   control = 380/495 (77%)
+#> -------------------------------------------------- 
+#> Use summary() for covariate balance details.
 ```
 
 When `mu.hat` is supplied with `cross.fitting = TRUE`, the package uses the

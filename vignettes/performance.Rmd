@@ -21,13 +21,10 @@ The pipeline has four stages, each optimized:
 3. **Indicator matrix construction** (`leaf_node_kernel_Z`) -- C++ via Rcpp,
    building CSC sparse format directly without sorting.
 4. **Weight computation** (`kernel_balance`) -- adaptive solver:
-   - **Direct**: sparse Cholesky on treated/control sub-blocks of `kern`.
-     Preferred for smaller problems.
+   - **Direct**: sparse Cholesky on treated/control sub-blocks. Preferred for
+     smaller problems.
    - **CG**: conjugate gradient using the factored $Z$ representation. No
-     kernel matrix is formed. Preferred for large $n$. Requires `Z` and
-     `num.trees`.
-   - **BJ**: Block Jacobi preconditioned CG. Additionally requires
-     `leaf_matrix`. Falls back to CG if `leaf_matrix` is not provided.
+     kernel matrix is formed. Preferred for large $n$ or dense kernels.
 
 
 ``` r
