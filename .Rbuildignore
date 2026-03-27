@@ -2,6 +2,8 @@
 ^\.Rproj\.user$
 ^README\.Rmd$
 ^README\.md$
+^cran-comments.md$
+^NEWS.md$
 ^man/figures/README-
 ^\.github$
 ^forestBalance\.Rcheck$
