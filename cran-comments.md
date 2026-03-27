@@ -2,6 +2,7 @@
 
 * New package upload
 * fixes pragma issue and other CRAN issues found
+* dramatically shortens vignettes
 
 ## Test environments
 
