@@ -1,12 +1,13 @@
-// [[Rcpp::depends(RcppEigen)]]
-#include <RcppEigen.h>
+#include "forestBalance_types.h"
 
 // Conjugate gradient solver for Z Z^T x = rhs (matrix-free).
 // Uses Eigen sparse mat-vecs with the C++ CG loop to avoid R overhead.
 // [[Rcpp::export]]
-Eigen::VectorXd cg_solve_cpp(const Eigen::MappedSparseMatrix<double>& Z,
-                              const Eigen::Map<Eigen::VectorXd>& rhs,
-                              double tol, int maxiter) {
+Rcpp::NumericVector cg_solve_cpp(Rcpp::S4 Z_s4, Rcpp::NumericVector rhs_r,
+                                  double tol, int maxiter) {
+  const Eigen::MappedSparseMatrix<double> Z(Rcpp::as<Eigen::MappedSparseMatrix<double> >(Z_s4));
+  const Eigen::Map<Eigen::VectorXd> rhs(rhs_r.begin(), rhs_r.size());
+
   int n = Z.rows();
   Eigen::VectorXd x = Eigen::VectorXd::Zero(n);
   Eigen::VectorXd r = rhs;
@@ -33,5 +34,5 @@ Eigen::VectorXd cg_solve_cpp(const Eigen::MappedSparseMatrix<double>& Z,
     rs = rsnew;
   }
 
-  return x;
+  return Rcpp::wrap(x);
 }

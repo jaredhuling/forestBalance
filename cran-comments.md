@@ -1,7 +1,6 @@
-## New version for 'personalized' -- 0.2.8
+## First upload for 'forestBalance' -- 0.1.0
 
-* Minor bug fixes
-* Fixes CRAN errors and RD warnings
+* New package upload
 
 ## Test environments
 
