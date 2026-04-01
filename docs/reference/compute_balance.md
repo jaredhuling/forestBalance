@@ -104,6 +104,9 @@ An object of class `"forest_balance_diag"` containing:
 
   Number of control units.
 
+The input `x`, invisibly. Called for its side effect of printing balance
+diagnostics to the console.
+
 ## Details
 
 The standardized mean difference for covariate \\j\\ is defined as

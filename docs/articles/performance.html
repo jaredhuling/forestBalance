@@ -93,17 +93,13 @@ adaptive solver:
 <ul>
 <li>
 <strong>Direct</strong>: sparse Cholesky on treated/control
-sub-blocks of <code>kern</code>. Preferred for smaller problems.</li>
+sub-blocks. Preferred for smaller problems.</li>
 <li>
 <strong>CG</strong>: conjugate gradient using the factored
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>Z</mi><annotation encoding="application/x-tex">Z</annotation></semantics></math>
 representation. No kernel matrix is formed. Preferred for large
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math>.
-Requires <code>Z</code> and <code>num.trees</code>.</li>
-<li>
-<strong>BJ</strong>: Block Jacobi preconditioned CG. Additionally
-requires <code>leaf_matrix</code>. Falls back to CG if
-<code>leaf_matrix</code> is not provided.</li>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math>
+or dense kernels.</li>
 </ul>
 </li>
 </ol>

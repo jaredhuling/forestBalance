@@ -21,3 +21,8 @@ print(x, ...)
 - ...:
 
   Ignored.
+
+## Value
+
+The input `x`, invisibly. Called for its side effect of printing a
+summary to the console.

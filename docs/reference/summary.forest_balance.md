@@ -80,6 +80,13 @@ Invisibly returns a list of class `"summary.forest_balance"` containing:
 
   Number of trees in the forest.
 
+- threshold:
+
+  The SMD threshold used for flagging imbalanced covariates.
+
+The input `x`, invisibly. Called for its side effect of printing a
+detailed balance summary to the console.
+
 ## Examples
 
 ``` r

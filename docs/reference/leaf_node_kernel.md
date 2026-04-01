@@ -22,8 +22,9 @@ leaf_node_kernel(leaf_matrix, sparse = TRUE)
 
 - sparse:
 
-  Logical; if `TRUE` (default), returns a sparse `dgCMatrix` from the
-  Matrix package. If `FALSE`, returns a dense base R matrix.
+  Logical; if `TRUE` (default), returns a sparse
+  [`dgCMatrix`](https://rdrr.io/pkg/Matrix/man/dgCMatrix-class.html)
+  from the Matrix package. If `FALSE`, returns a dense base R matrix.
 
 ## Value
 

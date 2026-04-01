@@ -252,7 +252,9 @@ res_1000 <- run_sim(n = 1000, seed = 1)
 
 Simulation results (50 reps, true ATE = 0).
 
-![](guide_files/figure-html/sim-plot-1.png)
+![plot of chunk sim-plot](guide-sim-plot-1.png)
+
+plot of chunk sim-plot
 
 All weighting methods improve over the naive estimator. At $`n = 500`$,
 entropy balancing (which only targets linear covariate means) retains

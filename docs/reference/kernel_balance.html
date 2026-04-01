@@ -184,7 +184,7 @@ effect estimation for high dimensional data.
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Both solvers give the same weights</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">bal_direct</span><span class="op">$</span><span class="va">weights</span> <span class="op">-</span> <span class="va">bal_cg</span><span class="op">$</span><span class="va">weights</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 1.444845e-07</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 2.038228e-07</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Weighted ATE estimate</span></span></span>
 <span class="r-in"><span><span class="va">w</span> <span class="op">&lt;-</span> <span class="va">bal_cg</span><span class="op">$</span><span class="va">weights</span></span></span>
