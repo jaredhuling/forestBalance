@@ -41,7 +41,11 @@ unweighted sample.}
 \item{n1}{Number of treated.}
 \item{n0}{Number of control.}
 \item{num.trees}{Number of trees in the forest.}
+\item{threshold}{The SMD threshold used for flagging imbalanced covariates.}
 }
+
+The input \code{x}, invisibly. Called for its side effect of
+printing a detailed balance summary to the console.
 }
 \description{
 Produces a detailed summary of the forest balance fit, including the ATE

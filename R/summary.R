@@ -8,6 +8,9 @@
 #'   \code{\link{forest_balance}}.
 #' @param ... Ignored.
 #'
+#' @return The input \code{x}, invisibly. Called for its side effect of
+#'   printing a summary to the console.
+#'
 #' @export
 print.forest_balance <- function(x, ...) {
   n  <- x$n
@@ -84,6 +87,7 @@ print.forest_balance <- function(x, ...) {
 #'   \item{n1}{Number of treated.}
 #'   \item{n0}{Number of control.}
 #'   \item{num.trees}{Number of trees in the forest.}
+#'   \item{threshold}{The SMD threshold used for flagging imbalanced covariates.}
 #' }
 #'
 #' @examples
@@ -148,6 +152,8 @@ summary.forest_balance <- function(object, X.trans = NULL, threshold = 0.1,
 
 #' @rdname summary.forest_balance
 #' @param x A \code{summary.forest_balance} object.
+#' @return The input \code{x}, invisibly. Called for its side effect of
+#'   printing a detailed balance summary to the console.
 #' @export
 print.summary.forest_balance <- function(x, ...) {
   threshold <- x$threshold

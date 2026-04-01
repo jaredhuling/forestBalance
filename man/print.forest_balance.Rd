@@ -12,6 +12,10 @@
 
 \item{...}{Ignored.}
 }
+\value{
+The input \code{x}, invisibly. Called for its side effect of
+printing a summary to the console.
+}
 \description{
 Displays a concise summary of the forest balance fit, including the ATE
 estimate, sample sizes, effective sample sizes, and a brief covariate

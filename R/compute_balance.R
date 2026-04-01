@@ -158,6 +158,8 @@ compute_balance <- function(X, trt, weights, X.trans = NULL,
 #' @param threshold SMD threshold for flagging imbalanced covariates. Default is
 #'   0.1, a standard threshold in the causal inference literature.
 #' @param ... Ignored.
+#' @return The input \code{x}, invisibly. Called for its side effect of
+#'   printing balance diagnostics to the console.
 #' @export
 print.forest_balance_diag <- function(x, threshold = 0.1, ...) {
   cat("Covariate Balance Diagnostics\n")

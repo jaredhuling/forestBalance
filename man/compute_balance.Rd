@@ -54,6 +54,9 @@ fraction of \eqn{n_0}.}
 \item{n1}{Number of treated units.}
 \item{n0}{Number of control units.}
 }
+
+The input \code{x}, invisibly. Called for its side effect of
+printing balance diagnostics to the console.
 }
 \description{
 Computes standardized mean differences (SMD), effective sample sizes (ESS),
