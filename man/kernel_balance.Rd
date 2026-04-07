@@ -10,6 +10,7 @@ kernel_balance(
   Z = NULL,
   leaf_matrix = NULL,
   num.trees = NULL,
+  estimand = c("ATE", "ATT", "ATC"),
   solver = c("auto", "direct", "cg", "bj"),
   tol = 1e-08,
   maxiter = 2000L

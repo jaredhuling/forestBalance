@@ -10,6 +10,7 @@ forest_balance(
   Y,
   num.trees = 1000,
   min.node.size = NULL,
+  estimand = c("ATE", "ATT", "ATC"),
   cross.fitting = TRUE,
   num.folds = 2,
   augmented = FALSE,

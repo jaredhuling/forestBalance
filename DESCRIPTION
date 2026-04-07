@@ -1,6 +1,6 @@
 Package: forestBalance
 Title: Balancing Confounder Distributions with Forest Energy Balancing
-Version: 0.1.0
+Version: 0.1.1
 Authors@R: c(
     person("Jared", "Huling", role = c("aut", "cre"), email = "jaredhuling@gmail.com"),
     person("Simion", "De", role = "aut")

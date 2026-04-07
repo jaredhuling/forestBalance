@@ -115,9 +115,11 @@
 #' @export
 kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
                            num.trees = NULL,
+                           estimand = c("ATE", "ATT", "ATC"),
                            solver = c("auto", "direct", "cg", "bj"),
                            tol = 1e-8, maxiter = 2000L) {
   solver <- match.arg(solver)
+  estimand <- match.arg(estimand)
 
   trt <- as.double(trt)
   n  <- length(trt)
@@ -169,34 +171,63 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
     # ------------------------------------------------------------------
     B <- num.trees
 
-    # b vector via Z: rowSums(K) = Z %*% colSums(Z) / B
-    rs <- as.numeric(Z %*% Matrix::colSums(Z)) / B
-    b  <- trt * rs / (n1 * n) + (1 - trt) * rs / (n0 * n)
+    Z_t <- Z[idx_t, , drop = FALSE]
+    Z_c <- Z[idx_c, , drop = FALSE]
 
-    Z_t <- Z[idx_t, ]
-    Z_c <- Z[idx_c, ]
-
-    if (solver == "bj") {
-      # Block Jacobi: build preconditioner from tree 1's leaf partition
-      solve_t <- .bj_pcg_solver(Z_t, leaf_matrix[idx_t, ], B, tol, maxiter)
-      solve_c <- .bj_pcg_solver(Z_c, leaf_matrix[idx_c, ], B, tol, maxiter)
+    # Compute b vector based on estimand
+    if (estimand == "ATE") {
+      rs <- as.numeric(Z %*% Matrix::colSums(Z)) / B
+      b  <- trt * rs / (n1 * n) + (1 - trt) * rs / (n0 * n)
+      b_t <- b[idx_t]
+      b_c <- b[idx_c]
+    } else if (estimand == "ATT") {
+      # Target is treated distribution; only control block needs solving
+      cs_zt <- Matrix::colSums(Z_t)
+      rs_to_t <- as.numeric(Z_c %*% cs_zt) / B
+      b_c <- rs_to_t / (n0 * n1)
     } else {
-      # Plain CG (Rcpp)
-      Z_t_csc <- as(Z_t, "dgCMatrix")
-      Z_c_csc <- as(Z_c, "dgCMatrix")
-      solve_t <- function(rhs) as.numeric(cg_solve_cpp(Z_t_csc, B * rhs, tol, maxiter))
-      solve_c <- function(rhs) as.numeric(cg_solve_cpp(Z_c_csc, B * rhs, tol, maxiter))
+      # ATC: target is control distribution; only treated block needs solving
+      cs_zc <- Matrix::colSums(Z_c)
+      rs_to_c <- as.numeric(Z_t %*% cs_zc) / B
+      b_t <- rs_to_c / (n1 * n0)
     }
 
-    # Treated block: 2 solves, 3rd by linear combination
-    s1 <- solve_t(ones_t);   sb <- solve_t(b[idx_t])
-    X11 <- n1^2 * sum(s1); YY1 <- n1^2 * sum(sb) - n1
-    w_t <- n1^2 * (sb - (YY1 / X11) * s1)
+    # Build solvers only for blocks that need them
+    if (estimand != "ATC") {
+      # Need control solver
+      if (solver == "bj") {
+        solve_c <- .bj_pcg_solver(Z_c, leaf_matrix[idx_c, ], B, tol, maxiter)
+      } else {
+        Z_c_csc <- as(Z_c, "dgCMatrix")
+        solve_c <- function(rhs) as.numeric(cg_solve_cpp(Z_c_csc, B * rhs, tol, maxiter))
+      }
+    }
+    if (estimand != "ATT") {
+      # Need treated solver
+      if (solver == "bj") {
+        solve_t <- .bj_pcg_solver(Z_t, leaf_matrix[idx_t, ], B, tol, maxiter)
+      } else {
+        Z_t_csc <- as(Z_t, "dgCMatrix")
+        solve_t <- function(rhs) as.numeric(cg_solve_cpp(Z_t_csc, B * rhs, tol, maxiter))
+      }
+    }
 
-    # Control block
-    s1 <- solve_c(ones_c);   sb <- solve_c(b[idx_c])
-    X22 <- n0^2 * sum(s1); YY2 <- n0^2 * sum(sb) - n0
-    w_c <- n0^2 * (sb - (YY2 / X22) * s1)
+    # Solve each block
+    if (estimand == "ATT") {
+      w_t <- ones_t
+    } else {
+      s1 <- solve_t(ones_t);   sb <- solve_t(b_t)
+      X11 <- n1^2 * sum(s1); YY1 <- n1^2 * sum(sb) - n1
+      w_t <- n1^2 * (sb - (YY1 / X11) * s1)
+    }
+
+    if (estimand == "ATC") {
+      w_c <- ones_c
+    } else {
+      s1 <- solve_c(ones_c);   sb <- solve_c(b_c)
+      X22 <- n0^2 * sum(s1); YY2 <- n0^2 * sum(sb) - n0
+      w_c <- n0^2 * (sb - (YY2 / X22) * s1)
+    }
 
   } else {
     # ------------------------------------------------------------------
@@ -209,23 +240,38 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
       stop("Kernel matrix dimensions must match the length of 'trt'.")
     }
 
-    rs <- as.numeric(Matrix::rowSums(kern))
-    b  <- trt * rs / (n1 * n) + (1 - trt) * rs / (n0 * n)
+    # Compute b vector based on estimand
+    if (estimand == "ATE") {
+      rs <- as.numeric(Matrix::rowSums(kern))
+      b  <- trt * rs / (n1 * n) + (1 - trt) * rs / (n0 * n)
+      b_t <- b[idx_t]
+      b_c <- b[idx_c]
+    } else if (estimand == "ATT") {
+      b_c <- as.numeric(kern[idx_c, idx_t] %*% ones_t) / (n0 * n1)
+    } else {
+      b_t <- as.numeric(kern[idx_t, idx_c] %*% ones_c) / (n1 * n0)
+    }
 
-    K_tt <- kern[idx_t, idx_t]
-    K_cc <- kern[idx_c, idx_c]
+    # Solve each block
+    if (estimand == "ATT") {
+      w_t <- ones_t
+    } else {
+      K_tt <- kern[idx_t, idx_t]
+      s1 <- as.numeric(solve(K_tt, ones_t))
+      sb <- as.numeric(solve(K_tt, b_t))
+      X11 <- n1^2 * sum(s1); YY1 <- n1^2 * sum(sb) - n1
+      w_t <- n1^2 * (sb - (YY1 / X11) * s1)
+    }
 
-    # Treated block: 2 solves, 3rd by linear combination
-    s1 <- as.numeric(solve(K_tt, ones_t))
-    sb <- as.numeric(solve(K_tt, b[idx_t]))
-    X11 <- n1^2 * sum(s1); YY1 <- n1^2 * sum(sb) - n1
-    w_t <- n1^2 * (sb - (YY1 / X11) * s1)
-
-    # Control block
-    s1 <- as.numeric(solve(K_cc, ones_c))
-    sb <- as.numeric(solve(K_cc, b[idx_c]))
-    X22 <- n0^2 * sum(s1); YY2 <- n0^2 * sum(sb) - n0
-    w_c <- n0^2 * (sb - (YY2 / X22) * s1)
+    if (estimand == "ATC") {
+      w_c <- ones_c
+    } else {
+      K_cc <- kern[idx_c, idx_c]
+      s1 <- as.numeric(solve(K_cc, ones_c))
+      sb <- as.numeric(solve(K_cc, b_c))
+      X22 <- n0^2 * sum(s1); YY2 <- n0^2 * sum(sb) - n0
+      w_c <- n0^2 * (sb - (YY2 / X22) * s1)
+    }
   }
 
   # Reassemble
@@ -233,7 +279,7 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
   w[idx_t] <- w_t
   w[idx_c] <- w_c
 
-  list(weights = w, solver = solver)
+  list(weights = w, solver = solver, estimand = estimand)
 }
 
 

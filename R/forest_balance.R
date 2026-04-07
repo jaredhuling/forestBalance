@@ -154,6 +154,7 @@
 forest_balance <- function(X, A, Y,
                            num.trees = 1000,
                            min.node.size = NULL,
+                           estimand = c("ATE", "ATT", "ATC"),
                            cross.fitting = TRUE,
                            num.folds = 2,
                            augmented = FALSE,
@@ -164,6 +165,7 @@ forest_balance <- function(X, A, Y,
                            parallel = FALSE,
                            ...) {
   solver <- match.arg(solver)
+  estimand <- match.arg(estimand)
   X <- as.matrix(X)
   n <- nrow(X)
   p <- ncol(X)
@@ -177,12 +179,12 @@ forest_balance <- function(X, A, Y,
 
   if (cross.fitting) {
     result <- .fit_crossfitted(X, A, Y, num.trees, min.node.size, num.folds,
-                               augmented, mu.hat, scale.outcomes, solver,
-                               tol, parallel, ...)
+                               augmented, mu.hat, scale.outcomes, estimand,
+                               solver, tol, parallel, ...)
   } else {
     result <- .fit_full_sample(X, A, Y, num.trees, min.node.size,
-                               augmented, mu.hat, scale.outcomes, solver,
-                               tol, ...)
+                               augmented, mu.hat, scale.outcomes, estimand,
+                               solver, tol, ...)
   }
 
   out <- c(result, list(
@@ -192,6 +194,7 @@ forest_balance <- function(X, A, Y,
     n         = n,
     n1        = as.integer(sum(A == 1)),
     n0        = as.integer(sum(A == 0)),
+    estimand  = estimand,
     crossfit  = cross.fitting,
     augmented = augmented
   ))
@@ -252,7 +255,7 @@ forest_balance <- function(X, A, Y,
 .fit_kernel_and_balance <- function(X_train, A_train, Y_train,
                                     X_pred, A_pred,
                                     num.trees, min.node.size,
-                                    scale.outcomes, solver, tol, ...) {
+                                    scale.outcomes, estimand, solver, tol, ...) {
   # Train joint forest
   response <- cbind(A_train, Y_train)
   if (scale.outcomes) response <- scale(response)
@@ -270,12 +273,13 @@ forest_balance <- function(X, A, Y,
   if (eff_solver %in% c("bj", "cg")) {
     Z <- leaf_node_kernel_Z(leaf_mat)
     bal <- kernel_balance(trt = A_pred, Z = Z, leaf_matrix = leaf_mat,
-                          num.trees = num.trees,
+                          num.trees = num.trees, estimand = estimand,
                           solver = eff_solver, tol = tol)
     K <- NULL
   } else {
     K <- leaf_node_kernel(leaf_mat)
-    bal <- kernel_balance(trt = A_pred, kern = K, solver = "direct")
+    bal <- kernel_balance(trt = A_pred, kern = K, estimand = estimand,
+                          solver = "direct")
     Z <- NULL
   }
 
@@ -308,17 +312,39 @@ forest_balance <- function(X, A, Y,
 
 #' Compute ATE from weights, outcomes, and optional outcome model predictions
 #' @noRd
-.compute_ate <- function(Y, A, w, augmented, mu1 = NULL, mu0 = NULL) {
-  if (augmented) {
-    # Doubly-robust: regression term + weighted bias correction
-    reg_term <- mean(mu1 - mu0)
-    corr_1 <- weighted.mean(Y[A == 1] - mu1[A == 1], w[A == 1])
-    corr_0 <- weighted.mean(Y[A == 0] - mu0[A == 0], w[A == 0])
-    reg_term + corr_1 - corr_0
+.compute_ate <- function(Y, A, w, augmented, estimand = "ATE",
+                         mu1 = NULL, mu0 = NULL) {
+  if (estimand == "ATT") {
+    if (augmented) {
+      # DR-ATT: regression on treated + bias corrections
+      reg_term <- mean(mu1[A == 1] - mu0[A == 1])
+      corr_1 <- mean(Y[A == 1] - mu1[A == 1])
+      corr_0 <- weighted.mean(Y[A == 0] - mu0[A == 0], w[A == 0])
+      reg_term + corr_1 - corr_0
+    } else {
+      mean(Y[A == 1]) - weighted.mean(Y[A == 0], w[A == 0])
+    }
+  } else if (estimand == "ATC") {
+    if (augmented) {
+      # DR-ATC: regression on control + bias corrections
+      reg_term <- mean(mu1[A == 0] - mu0[A == 0])
+      corr_1 <- weighted.mean(Y[A == 1] - mu1[A == 1], w[A == 1])
+      corr_0 <- mean(Y[A == 0] - mu0[A == 0])
+      reg_term + corr_1 - corr_0
+    } else {
+      weighted.mean(Y[A == 1], w[A == 1]) - mean(Y[A == 0])
+    }
   } else {
-    # Hajek weighted estimator
-    weighted.mean(Y[A == 1], w[A == 1]) -
-      weighted.mean(Y[A == 0], w[A == 0])
+    # ATE
+    if (augmented) {
+      reg_term <- mean(mu1 - mu0)
+      corr_1 <- weighted.mean(Y[A == 1] - mu1[A == 1], w[A == 1])
+      corr_0 <- weighted.mean(Y[A == 0] - mu0[A == 0], w[A == 0])
+      reg_term + corr_1 - corr_0
+    } else {
+      weighted.mean(Y[A == 1], w[A == 1]) -
+        weighted.mean(Y[A == 0], w[A == 0])
+    }
   }
 }
 
@@ -327,7 +353,8 @@ forest_balance <- function(X, A, Y,
 #' @return List with fold-level results (ate, weights, mu1, mu0, etc.)
 #' @noRd
 .fit_one_fold <- function(k, fold_ids, X, A, Y, num.trees, min.node.size,
-                          augmented, mu.hat, scale.outcomes, solver, tol, ...) {
+                          augmented, mu.hat, scale.outcomes, estimand,
+                          solver, tol, ...) {
   idx_k    <- which(fold_ids == k)
   idx_notk <- which(fold_ids != k)
 
@@ -345,7 +372,8 @@ forest_balance <- function(X, A, Y,
     A_train = A[idx_notk], Y_train = Y[idx_notk],
     X_pred = X[idx_k, , drop = FALSE], A_pred = A_k,
     num.trees = num.trees, min.node.size = min.node.size,
-    scale.outcomes = scale.outcomes, solver = solver, tol = tol, ...
+    scale.outcomes = scale.outcomes, estimand = estimand,
+    solver = solver, tol = tol, ...
   )
 
   # Outcome model predictions for augmentation
@@ -365,7 +393,8 @@ forest_balance <- function(X, A, Y,
     }
   }
 
-  ate_k <- .compute_ate(Y_k, A_k, kb$weights, augmented, mu1_k, mu0_k)
+  ate_k <- .compute_ate(Y_k, A_k, kb$weights, augmented, estimand,
+                         mu1_k, mu0_k)
 
   list(idx = idx_k, ate = ate_k, weights = kb$weights,
        mu1 = mu1_k, mu0 = mu0_k,
@@ -376,8 +405,8 @@ forest_balance <- function(X, A, Y,
 #' Cross-fitted estimation path
 #' @noRd
 .fit_crossfitted <- function(X, A, Y, num.trees, min.node.size, num.folds,
-                             augmented, mu.hat, scale.outcomes, solver,
-                             tol, parallel, ...) {
+                             augmented, mu.hat, scale.outcomes, estimand,
+                             solver, tol, parallel, ...) {
   n <- nrow(X)
   fold_ids <- sample(rep(seq_len(num.folds), length.out = n))
 
@@ -394,8 +423,8 @@ forest_balance <- function(X, A, Y,
   fold_args <- list(fold_ids = fold_ids, X = X, A = A, Y = Y,
                     num.trees = num.trees, min.node.size = min.node.size,
                     augmented = augmented, mu.hat = mu.hat,
-                    scale.outcomes = scale.outcomes, solver = solver,
-                    tol = tol, ...)
+                    scale.outcomes = scale.outcomes, estimand = estimand,
+                    solver = solver, tol = tol, ...)
 
   run_fold <- function(k) {
     do.call(.fit_one_fold, c(list(k = k), fold_args))
@@ -454,8 +483,8 @@ forest_balance <- function(X, A, Y,
 #' Full-sample (no cross-fitting) estimation path
 #' @noRd
 .fit_full_sample <- function(X, A, Y, num.trees, min.node.size,
-                             augmented, mu.hat, scale.outcomes, solver,
-                             tol, ...) {
+                             augmented, mu.hat, scale.outcomes, estimand,
+                             solver, tol, ...) {
   n <- nrow(X)
 
   # Fit kernel and compute weights
@@ -463,7 +492,8 @@ forest_balance <- function(X, A, Y,
     X_train = X, A_train = A, Y_train = Y,
     X_pred = X, A_pred = A,
     num.trees = num.trees, min.node.size = min.node.size,
-    scale.outcomes = scale.outcomes, solver = solver, tol = tol, ...
+    scale.outcomes = scale.outcomes, estimand = estimand,
+    solver = solver, tol = tol, ...
   )
 
   # Outcome model predictions for augmentation
@@ -479,7 +509,7 @@ forest_balance <- function(X, A, Y,
     }
   }
 
-  ate <- .compute_ate(Y, A, kb$weights, augmented, mu1_hat, mu0_hat)
+  ate <- .compute_ate(Y, A, kb$weights, augmented, estimand, mu1_hat, mu0_hat)
 
   list(
     ate     = ate,

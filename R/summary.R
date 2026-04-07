@@ -19,6 +19,8 @@ print.forest_balance <- function(x, ...) {
   w  <- x$weights
   is_cf <- isTRUE(x$crossfit)
 
+  estimand <- if (!is.null(x$estimand)) x$estimand else "ATE"
+
   if (is_cf) {
     cat("Forest Kernel Energy Balancing (cross-fitted)\n")
   } else {
@@ -28,6 +30,7 @@ print.forest_balance <- function(x, ...) {
   cat(sprintf("  n = %s  (n_treated = %d, n_control = %d)\n",
               format(n, big.mark = ","), n1, n0))
   cat(sprintf("  Trees: %d\n", x$forest[["_num_trees"]]))
+  cat(sprintf("  Estimand: %s\n", estimand))
   if (is_cf) {
     cat(sprintf("  Cross-fitting: %d folds\n", x$num.folds))
   }
@@ -35,7 +38,7 @@ print.forest_balance <- function(x, ...) {
     cat("  Augmented: yes (doubly-robust)\n")
   }
   cat(sprintf("  Solver: %s\n", x$solver))
-  cat(sprintf("  ATE estimate: %.4f\n", x$ate))
+  cat(sprintf("  %s estimate: %.4f\n", estimand, x$ate))
 
   if (is_cf) {
     cat(sprintf("  Fold ATEs: %s\n",
