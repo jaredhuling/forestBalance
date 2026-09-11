@@ -12,6 +12,7 @@ kernel_balance(
   num.trees = NULL,
   estimand = c("ATE", "ATT", "ATC"),
   solver = c("auto", "direct", "cg", "bj"),
+  lambda = 0,
   tol = 1e-08,
   maxiter = 2000L
 )
@@ -45,6 +46,11 @@ provided.}
 the best available solver based on the inputs: \code{"cg"} when \code{Z}
 is available and \eqn{n > 5000}, or \code{"direct"} otherwise. See
 Details for solver requirements.}
+
+\item{lambda}{Nonnegative ridge penalty on the weights. The group-\eqn{a} problem
+solved is \eqn{\tfrac12 \| \sum_{i \in S_a} w_i K(X_i,\cdot) - n_a P_n \|^2 + \tfrac{\lambda}{2}\|w_a\|^2}
+subject to \eqn{\sum_{i \in S_a} w_i = n_a}, whose KKT system is
+\eqn{(K_{aa} + \lambda I) w_a = b_a + \gamma_a 1}. Default \code{0} (no ridge).}
 
 \item{tol}{Convergence tolerance for iterative solvers. Default is
 \code{1e-8}.}

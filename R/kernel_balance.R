@@ -28,6 +28,10 @@
 #'   the best available solver based on the inputs: \code{"cg"} when \code{Z}
 #'   is available and \eqn{n > 5000}, or \code{"direct"} otherwise. See
 #'   Details for solver requirements.
+#' @param lambda Nonnegative ridge penalty on the weights. The group-\eqn{a} problem
+#'   solved is \eqn{\tfrac12 \| \sum_{i \in S_a} w_i K(X_i,\cdot) - n_a P_n \|^2 + \tfrac{\lambda}{2}\|w_a\|^2}
+#'   subject to \eqn{\sum_{i \in S_a} w_i = n_a}, whose KKT system is
+#'   \eqn{(K_{aa} + \lambda I) w_a = b_a + \gamma_a 1}. Default \code{0} (no ridge).
 #' @param tol Convergence tolerance for iterative solvers. Default is
 #'   \code{1e-8}.
 #' @param maxiter Maximum iterations for iterative solvers. Default is 2000.
@@ -117,9 +121,20 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
                            num.trees = NULL,
                            estimand = c("ATE", "ATT", "ATC"),
                            solver = c("auto", "direct", "cg", "bj"),
+                           lambda = 0,
                            tol = 1e-8, maxiter = 2000L) {
   solver <- match.arg(solver)
   estimand <- match.arg(estimand)
+  if (!is.numeric(lambda) || length(lambda) != 1L || is.na(lambda) || lambda < 0) {
+    stop("'lambda' must be a single nonnegative number.")
+  }
+  iters_env <- new.env()
+  iters_env$max <- NA_integer_
+  note_iters <- function(res) {
+    it <- attr(res, "iters")
+    if (!is.null(it)) iters_env$max <- max(iters_env$max, it, na.rm = TRUE)
+    as.numeric(res)
+  }
 
   trt <- as.double(trt)
   n  <- length(trt)
@@ -196,19 +211,21 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
     if (estimand != "ATC") {
       # Need control solver
       if (solver == "bj") {
-        solve_c <- .bj_pcg_solver(Z_c, leaf_matrix[idx_c, ], B, tol, maxiter)
+        solve_c0 <- .bj_pcg_solver(Z_c, leaf_matrix[idx_c, ], B, tol, maxiter, lambda)
+        solve_c <- function(rhs) note_iters(solve_c0(rhs))
       } else {
         Z_c_csc <- as(Z_c, "dgCMatrix")
-        solve_c <- function(rhs) as.numeric(cg_solve_cpp(Z_c_csc, B * rhs, tol, maxiter))
+        solve_c <- function(rhs) note_iters(cg_solve_cpp(Z_c_csc, B * rhs, tol, maxiter, B * lambda))
       }
     }
     if (estimand != "ATT") {
       # Need treated solver
       if (solver == "bj") {
-        solve_t <- .bj_pcg_solver(Z_t, leaf_matrix[idx_t, ], B, tol, maxiter)
+        solve_t0 <- .bj_pcg_solver(Z_t, leaf_matrix[idx_t, ], B, tol, maxiter, lambda)
+        solve_t <- function(rhs) note_iters(solve_t0(rhs))
       } else {
         Z_t_csc <- as(Z_t, "dgCMatrix")
-        solve_t <- function(rhs) as.numeric(cg_solve_cpp(Z_t_csc, B * rhs, tol, maxiter))
+        solve_t <- function(rhs) note_iters(cg_solve_cpp(Z_t_csc, B * rhs, tol, maxiter, B * lambda))
       }
     }
 
@@ -257,6 +274,7 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
       w_t <- ones_t
     } else {
       K_tt <- kern[idx_t, idx_t]
+      if (lambda > 0) K_tt <- K_tt + lambda * Matrix::Diagonal(n1)
       s1 <- as.numeric(solve(K_tt, ones_t))
       sb <- as.numeric(solve(K_tt, b_t))
       X11 <- n1^2 * sum(s1); YY1 <- n1^2 * sum(sb) - n1
@@ -267,6 +285,7 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
       w_c <- ones_c
     } else {
       K_cc <- kern[idx_c, idx_c]
+      if (lambda > 0) K_cc <- K_cc + lambda * Matrix::Diagonal(n0)
       s1 <- as.numeric(solve(K_cc, ones_c))
       sb <- as.numeric(solve(K_cc, b_c))
       X22 <- n0^2 * sum(s1); YY2 <- n0^2 * sum(sb) - n0
@@ -279,15 +298,17 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
   w[idx_t] <- w_t
   w[idx_c] <- w_c
 
-  list(weights = w, solver = solver, estimand = estimand)
+  list(weights = w, solver = solver, estimand = estimand, lambda = lambda,
+       iters = iters_env$max)
 }
 
 
 # Block Jacobi preconditioned CG solver.
-# Returns a function(rhs) that solves Z_g Z_g^T x = B * rhs using
-# tree 1's leaf partition as a block-diagonal preconditioner.
+# Returns a function(rhs) that solves (Z_g Z_g^T + B * lambda * I) x = B * rhs using
+# tree 1's leaf partition (plus the ridge) as a block-diagonal preconditioner.
+# The result carries the iteration count as attribute "iters".
 # @noRd
-.bj_pcg_solver <- function(Z_g, lm_g, B, tol, maxiter) {
+.bj_pcg_solver <- function(Z_g, lm_g, B, tol, maxiter, lambda = 0) {
   Z_g_csc <- as(Z_g, "dgCMatrix")
   ng <- nrow(Z_g)
 
@@ -297,6 +318,7 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
   groups <- split(seq_len(ng), leaves)
   block_solvers <- lapply(groups, function(idx) {
     K_block <- Matrix::tcrossprod(Z_g[idx, , drop = FALSE]) / B
+    if (lambda > 0) K_block <- K_block + lambda * Matrix::Diagonal(length(idx))
     tryCatch(
       { ch <- chol(as.matrix(K_block)); function(v) backsolve(ch, forwardsolve(t(ch), v)) },
       error = function(e) function(v) v  # identity fallback
@@ -314,7 +336,7 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
   # Return a solve function
   function(rhs) {
     rhs_scaled <- B * rhs
-    Kv <- function(v) as.numeric(Z_g_csc %*% Matrix::crossprod(Z_g_csc, v))
+    Kv <- function(v) as.numeric(Z_g_csc %*% Matrix::crossprod(Z_g_csc, v)) + B * lambda * v
 
     x <- numeric(ng)
     r <- rhs_scaled - Kv(x)
@@ -322,8 +344,10 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
     p <- z
     rz <- sum(r * z)
     rhs_norm <- sqrt(sum(rhs_scaled^2))
+    iters <- 0L
 
     for (i in seq_len(maxiter)) {
+      iters <- i
       Ap <- Kv(p)
       pAp <- sum(p * Ap)
       if (pAp <= 0 || !is.finite(pAp)) break
@@ -338,6 +362,7 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
       p <- z + (rz_new / rz) * p
       rz <- rz_new
     }
+    attr(x, "iters") <- iters
     x
   }
 }

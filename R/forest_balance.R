@@ -43,6 +43,8 @@
 #'   \code{"auto"} (default) selects \code{"direct"} for small fold sizes
 #'   and \code{"cg"} for large fold sizes. See \code{\link{kernel_balance}} for
 #'   details.
+#' @param lambda Nonnegative ridge penalty on the balancing weights; see
+#'   \code{\link{kernel_balance}}. Default \code{0}.
 #' @param tol Convergence tolerance for the CG solver. Default is \code{5e-11}.
 #' @param parallel Logical or integer. If \code{FALSE} (default), folds are
 #'   processed sequentially. If \code{TRUE}, folds are processed in parallel
@@ -161,6 +163,7 @@ forest_balance <- function(X, A, Y,
                            mu.hat = NULL,
                            scale.outcomes = TRUE,
                            solver = c("auto", "direct", "cg", "bj"),
+                           lambda = 0,
                            tol = 1e-8,
                            parallel = FALSE,
                            ...) {
@@ -180,11 +183,11 @@ forest_balance <- function(X, A, Y,
   if (cross.fitting) {
     result <- .fit_crossfitted(X, A, Y, num.trees, min.node.size, num.folds,
                                augmented, mu.hat, scale.outcomes, estimand,
-                               solver, tol, parallel, ...)
+                               solver, lambda, tol, parallel, ...)
   } else {
     result <- .fit_full_sample(X, A, Y, num.trees, min.node.size,
                                augmented, mu.hat, scale.outcomes, estimand,
-                               solver, tol, ...)
+                               solver, lambda, tol, ...)
   }
 
   out <- c(result, list(
@@ -196,7 +199,9 @@ forest_balance <- function(X, A, Y,
     n0        = as.integer(sum(A == 0)),
     estimand  = estimand,
     crossfit  = cross.fitting,
-    augmented = augmented
+    augmented = augmented,
+    lambda    = lambda,
+    min.node.size = min.node.size
   ))
   class(out) <- "forest_balance"
   out
@@ -255,7 +260,7 @@ forest_balance <- function(X, A, Y,
 .fit_kernel_and_balance <- function(X_train, A_train, Y_train,
                                     X_pred, A_pred,
                                     num.trees, min.node.size,
-                                    scale.outcomes, estimand, solver, tol, ...) {
+                                    scale.outcomes, estimand, solver, lambda, tol, ...) {
   # Train joint forest
   response <- cbind(A_train, Y_train)
   if (scale.outcomes) response <- scale(response)
@@ -274,17 +279,21 @@ forest_balance <- function(X, A, Y,
     Z <- leaf_node_kernel_Z(leaf_mat)
     bal <- kernel_balance(trt = A_pred, Z = Z, leaf_matrix = leaf_mat,
                           num.trees = num.trees, estimand = estimand,
-                          solver = eff_solver, tol = tol)
+                          solver = eff_solver, lambda = lambda, tol = tol)
     K <- NULL
   } else {
     K <- leaf_node_kernel(leaf_mat)
     bal <- kernel_balance(trt = A_pred, kern = K, estimand = estimand,
-                          solver = "direct")
+                          solver = "direct", lambda = lambda)
     Z <- NULL
   }
 
+  # Leaf counts per tree among the prediction points (diagnostic for the theory).
+  leaf_counts <- apply(leaf_mat, 2, function(v) length(unique(v)))
+
   list(weights = bal$weights, forest = forest,
-       solver = bal$solver, kernel = K)
+       solver = bal$solver, kernel = K,
+       leaf_counts = leaf_counts, cg_iters = bal$iters)
 }
 
 
@@ -354,7 +363,7 @@ forest_balance <- function(X, A, Y,
 #' @noRd
 .fit_one_fold <- function(k, fold_ids, X, A, Y, num.trees, min.node.size,
                           augmented, mu.hat, scale.outcomes, estimand,
-                          solver, tol, ...) {
+                          solver, lambda, tol, ...) {
   idx_k    <- which(fold_ids == k)
   idx_notk <- which(fold_ids != k)
 
@@ -373,7 +382,7 @@ forest_balance <- function(X, A, Y,
     X_pred = X[idx_k, , drop = FALSE], A_pred = A_k,
     num.trees = num.trees, min.node.size = min.node.size,
     scale.outcomes = scale.outcomes, estimand = estimand,
-    solver = solver, tol = tol, ...
+    solver = solver, lambda = lambda, tol = tol, ...
   )
 
   # Outcome model predictions for augmentation
@@ -398,7 +407,8 @@ forest_balance <- function(X, A, Y,
 
   list(idx = idx_k, ate = ate_k, weights = kb$weights,
        mu1 = mu1_k, mu0 = mu0_k,
-       forest = kb$forest, solver = kb$solver)
+       forest = kb$forest, solver = kb$solver,
+       leaf_counts = kb$leaf_counts, cg_iters = kb$cg_iters)
 }
 
 
@@ -406,7 +416,7 @@ forest_balance <- function(X, A, Y,
 #' @noRd
 .fit_crossfitted <- function(X, A, Y, num.trees, min.node.size, num.folds,
                              augmented, mu.hat, scale.outcomes, estimand,
-                             solver, tol, parallel, ...) {
+                             solver, lambda, tol, parallel, ...) {
   n <- nrow(X)
   fold_ids <- sample(rep(seq_len(num.folds), length.out = n))
 
@@ -424,7 +434,7 @@ forest_balance <- function(X, A, Y,
                     num.trees = num.trees, min.node.size = min.node.size,
                     augmented = augmented, mu.hat = mu.hat,
                     scale.outcomes = scale.outcomes, estimand = estimand,
-                    solver = solver, tol = tol, ...)
+                    solver = solver, lambda = lambda, tol = tol, ...)
 
   run_fold <- function(k) {
     do.call(.fit_one_fold, c(list(k = k), fold_args))
@@ -444,11 +454,15 @@ forest_balance <- function(X, A, Y,
   mu0_hat   <- if (augmented) numeric(n) else NULL
   last_forest <- NULL
   last_solver <- NULL
+  leaf_counts <- vector("list", num.folds)
+  cg_iters    <- rep(NA_integer_, num.folds)
 
   for (k in seq_len(num.folds)) {
     res_k <- fold_results[[k]]
     fold_ates[k] <- res_k$ate
     weights[res_k$idx] <- res_k$weights
+    if (!is.null(res_k$leaf_counts)) leaf_counts[[k]] <- res_k$leaf_counts
+    if (!is.null(res_k$cg_iters)) cg_iters[k] <- res_k$cg_iters
     if (augmented) {
       mu1_hat[res_k$idx] <- res_k$mu1
       mu0_hat[res_k$idx] <- res_k$mu0
@@ -475,7 +489,9 @@ forest_balance <- function(X, A, Y,
     kernel    = NULL,
     forest    = last_forest,
     solver    = last_solver,
-    num.folds = num.folds
+    num.folds = num.folds,
+    leaf_counts = leaf_counts,
+    cg_iters  = cg_iters
   )
 }
 
@@ -484,7 +500,7 @@ forest_balance <- function(X, A, Y,
 #' @noRd
 .fit_full_sample <- function(X, A, Y, num.trees, min.node.size,
                              augmented, mu.hat, scale.outcomes, estimand,
-                             solver, tol, ...) {
+                             solver, lambda, tol, ...) {
   n <- nrow(X)
 
   # Fit kernel and compute weights
@@ -493,7 +509,7 @@ forest_balance <- function(X, A, Y,
     X_pred = X, A_pred = A,
     num.trees = num.trees, min.node.size = min.node.size,
     scale.outcomes = scale.outcomes, estimand = estimand,
-    solver = solver, tol = tol, ...
+    solver = solver, lambda = lambda, tol = tol, ...
   )
 
   # Outcome model predictions for augmentation
@@ -518,6 +534,8 @@ forest_balance <- function(X, A, Y,
     mu0.hat = mu0_hat,
     kernel  = kb$kernel,
     forest  = kb$forest,
-    solver  = kb$solver
+    solver  = kb$solver,
+    leaf_counts = kb$leaf_counts,
+    cg_iters = kb$cg_iters
   )
 }

@@ -13,8 +13,8 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // cg_solve_cpp
-Rcpp::NumericVector cg_solve_cpp(Rcpp::S4 Z_s4, Rcpp::NumericVector rhs_r, double tol, int maxiter);
-RcppExport SEXP _forestBalance_cg_solve_cpp(SEXP Z_s4SEXP, SEXP rhs_rSEXP, SEXP tolSEXP, SEXP maxiterSEXP) {
+Rcpp::NumericVector cg_solve_cpp(Rcpp::S4 Z_s4, Rcpp::NumericVector rhs_r, double tol, int maxiter, double ridge);
+RcppExport SEXP _forestBalance_cg_solve_cpp(SEXP Z_s4SEXP, SEXP rhs_rSEXP, SEXP tolSEXP, SEXP maxiterSEXP, SEXP ridgeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -22,7 +22,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< Rcpp::NumericVector >::type rhs_r(rhs_rSEXP);
     Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
     Rcpp::traits::input_parameter< int >::type maxiter(maxiterSEXP);
-    rcpp_result_gen = Rcpp::wrap(cg_solve_cpp(Z_s4, rhs_r, tol, maxiter));
+    Rcpp::traits::input_parameter< double >::type ridge(ridgeSEXP);
+    rcpp_result_gen = Rcpp::wrap(cg_solve_cpp(Z_s4, rhs_r, tol, maxiter, ridge));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -62,7 +63,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_forestBalance_cg_solve_cpp", (DL_FUNC) &_forestBalance_cg_solve_cpp, 4},
+    {"_forestBalance_cg_solve_cpp", (DL_FUNC) &_forestBalance_cg_solve_cpp, 5},
     {"_forestBalance_get_leaf_nodes_cpp", (DL_FUNC) &_forestBalance_get_leaf_nodes_cpp, 2},
     {"_forestBalance_build_Z_cpp", (DL_FUNC) &_forestBalance_build_Z_cpp, 1},
     {"_forestBalance_remap_leaves_cpp", (DL_FUNC) &_forestBalance_remap_leaves_cpp, 1},

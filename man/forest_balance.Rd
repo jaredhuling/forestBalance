@@ -17,6 +17,7 @@ forest_balance(
   mu.hat = NULL,
   scale.outcomes = TRUE,
   solver = c("auto", "direct", "cg", "bj"),
+  lambda = 0,
   tol = 1e-08,
   parallel = FALSE,
   ...
@@ -69,6 +70,9 @@ ensures that treatment and outcome contribute equally to the splits.}
 \code{"auto"} (default) selects \code{"direct"} for small fold sizes
 and \code{"cg"} for large fold sizes. See \code{\link{kernel_balance}} for
 details.}
+
+\item{lambda}{Nonnegative ridge penalty on the balancing weights; see
+\code{\link{kernel_balance}}. Default \code{0}.}
 
 \item{tol}{Convergence tolerance for the CG solver. Default is \code{5e-11}.}
 
