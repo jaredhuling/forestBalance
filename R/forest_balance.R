@@ -16,6 +16,7 @@
 #'   \code{max(20, min(floor(n/200) + p, floor(n/50)))}. This scales the leaf
 #'   size with both the sample size and the number of covariates, which
 #'   empirically yields low bias. See Details.
+#' @param estimand Target estimand: \code{"ATE"} (default), \code{"ATT"}, or \code{"ATC"}.
 #' @param cross.fitting Logical; if \code{TRUE} (default), use K-fold
 #'   cross-fitting to construct the kernel from held-out data, reducing
 #'   overfitting bias. If \code{FALSE}, the kernel is estimated on the full
@@ -45,6 +46,13 @@
 #'   details.
 #' @param lambda Nonnegative ridge penalty on the balancing weights; see
 #'   \code{\link{kernel_balance}}. Default \code{0}.
+#' @param kernel.response Which responses the kernel-defining forest is fit to:
+#'   \code{"joint"} (default; treatment and outcome, the proposed method),
+#'   \code{"treatment"} (treatment only), or \code{"outcome"} (outcome only). The
+#'   latter two exist for ablation studies.
+#' @param crossfit.balance Under cross-fitting, whether the balancing problem for fold
+#'   \eqn{v} is solved within the fold (\code{"fold"}, default) or on the full sample with
+#'   the kernel learned on the other folds, keeping only fold \eqn{v}'s weights (\code{"full"}).
 #' @param tol Convergence tolerance for the CG solver. Default is \code{5e-11}.
 #' @param parallel Logical or integer. If \code{FALSE} (default), folds are
 #'   processed sequentially. If \code{TRUE}, folds are processed in parallel
@@ -164,10 +172,14 @@ forest_balance <- function(X, A, Y,
                            scale.outcomes = TRUE,
                            solver = c("auto", "direct", "cg", "bj"),
                            lambda = 0,
+                           kernel.response = c("joint", "treatment", "outcome"),
+                           crossfit.balance = c("fold", "full"),
                            tol = 1e-8,
                            parallel = FALSE,
                            ...) {
   solver <- match.arg(solver)
+  kernel.response <- match.arg(kernel.response)
+  crossfit.balance <- match.arg(crossfit.balance)
   estimand <- match.arg(estimand)
   X <- as.matrix(X)
   n <- nrow(X)
@@ -183,11 +195,11 @@ forest_balance <- function(X, A, Y,
   if (cross.fitting) {
     result <- .fit_crossfitted(X, A, Y, num.trees, min.node.size, num.folds,
                                augmented, mu.hat, scale.outcomes, estimand,
-                               solver, lambda, tol, parallel, ...)
+                               solver, lambda, kernel.response, crossfit.balance, tol, parallel, ...)
   } else {
     result <- .fit_full_sample(X, A, Y, num.trees, min.node.size,
                                augmented, mu.hat, scale.outcomes, estimand,
-                               solver, lambda, tol, ...)
+                               solver, lambda, kernel.response, tol, ...)
   }
 
   out <- c(result, list(
@@ -201,6 +213,8 @@ forest_balance <- function(X, A, Y,
     crossfit  = cross.fitting,
     augmented = augmented,
     lambda    = lambda,
+    kernel.response = kernel.response,
+    crossfit.balance = if (cross.fitting) crossfit.balance else NA_character_,
     min.node.size = min.node.size
   ))
   class(out) <- "forest_balance"
@@ -260,9 +274,14 @@ forest_balance <- function(X, A, Y,
 .fit_kernel_and_balance <- function(X_train, A_train, Y_train,
                                     X_pred, A_pred,
                                     num.trees, min.node.size,
-                                    scale.outcomes, estimand, solver, lambda, tol, ...) {
-  # Train joint forest
-  response <- cbind(A_train, Y_train)
+                                    scale.outcomes, estimand, solver, lambda, tol,
+                                    kernel.response = "joint", ...) {
+  # Train the forest whose leaves define the kernel: on (A, Y) jointly (the proposed
+  # method), or on A alone or Y alone for the kernel ablation.
+  response <- switch(kernel.response,
+                     joint = cbind(A_train, Y_train),
+                     treatment = cbind(A_train),
+                     outcome = cbind(Y_train))
   if (scale.outcomes) response <- scale(response)
 
   forest <- grf::multi_regression_forest(
@@ -363,7 +382,8 @@ forest_balance <- function(X, A, Y,
 #' @noRd
 .fit_one_fold <- function(k, fold_ids, X, A, Y, num.trees, min.node.size,
                           augmented, mu.hat, scale.outcomes, estimand,
-                          solver, lambda, tol, ...) {
+                          solver, lambda, kernel.response, tol,
+                          crossfit.balance = "fold", ...) {
   idx_k    <- which(fold_ids == k)
   idx_notk <- which(fold_ids != k)
 
@@ -375,14 +395,19 @@ forest_balance <- function(X, A, Y,
                 mu1 = NULL, mu0 = NULL, forest = NULL, solver = NULL))
   }
 
-  # Fit kernel and compute weights
+  # Fit the kernel on the other folds. With crossfit.balance = "fold" the balancing problem is
+  # solved within fold k only; with "full" it is solved on the full sample using that kernel and
+  # only fold k's weights are kept, so fold k's weights still depend on outcomes only through the
+  # other folds while the balancing problem keeps the full sample size.
+  full_bal <- identical(crossfit.balance, "full")
   kb <- .fit_kernel_and_balance(
     X_train = X[idx_notk, , drop = FALSE],
     A_train = A[idx_notk], Y_train = Y[idx_notk],
-    X_pred = X[idx_k, , drop = FALSE], A_pred = A_k,
+    X_pred = if (full_bal) X else X[idx_k, , drop = FALSE],
+    A_pred = if (full_bal) A else A_k,
     num.trees = num.trees, min.node.size = min.node.size,
     scale.outcomes = scale.outcomes, estimand = estimand,
-    solver = solver, lambda = lambda, tol = tol, ...
+    solver = solver, lambda = lambda, tol = tol, kernel.response = kernel.response, ...
   )
 
   # Outcome model predictions for augmentation
@@ -402,10 +427,11 @@ forest_balance <- function(X, A, Y,
     }
   }
 
-  ate_k <- .compute_ate(Y_k, A_k, kb$weights, augmented, estimand,
+  w_k <- if (full_bal) kb$weights[idx_k] else kb$weights
+  ate_k <- .compute_ate(Y_k, A_k, w_k, augmented, estimand,
                          mu1_k, mu0_k)
 
-  list(idx = idx_k, ate = ate_k, weights = kb$weights,
+  list(idx = idx_k, ate = ate_k, weights = w_k,
        mu1 = mu1_k, mu0 = mu0_k,
        forest = kb$forest, solver = kb$solver,
        leaf_counts = kb$leaf_counts, cg_iters = kb$cg_iters)
@@ -416,7 +442,7 @@ forest_balance <- function(X, A, Y,
 #' @noRd
 .fit_crossfitted <- function(X, A, Y, num.trees, min.node.size, num.folds,
                              augmented, mu.hat, scale.outcomes, estimand,
-                             solver, lambda, tol, parallel, ...) {
+                             solver, lambda, kernel.response, crossfit.balance, tol, parallel, ...) {
   n <- nrow(X)
   fold_ids <- sample(rep(seq_len(num.folds), length.out = n))
 
@@ -434,7 +460,8 @@ forest_balance <- function(X, A, Y,
                     num.trees = num.trees, min.node.size = min.node.size,
                     augmented = augmented, mu.hat = mu.hat,
                     scale.outcomes = scale.outcomes, estimand = estimand,
-                    solver = solver, lambda = lambda, tol = tol, ...)
+                    solver = solver, lambda = lambda, kernel.response = kernel.response,
+                    tol = tol, crossfit.balance = crossfit.balance, ...)
 
   run_fold <- function(k) {
     do.call(.fit_one_fold, c(list(k = k), fold_args))
@@ -500,7 +527,7 @@ forest_balance <- function(X, A, Y,
 #' @noRd
 .fit_full_sample <- function(X, A, Y, num.trees, min.node.size,
                              augmented, mu.hat, scale.outcomes, estimand,
-                             solver, lambda, tol, ...) {
+                             solver, lambda, kernel.response, tol, ...) {
   n <- nrow(X)
 
   # Fit kernel and compute weights
@@ -509,7 +536,7 @@ forest_balance <- function(X, A, Y,
     X_pred = X, A_pred = A,
     num.trees = num.trees, min.node.size = min.node.size,
     scale.outcomes = scale.outcomes, estimand = estimand,
-    solver = solver, lambda = lambda, tol = tol, ...
+    solver = solver, lambda = lambda, tol = tol, kernel.response = kernel.response, ...
   )
 
   # Outcome model predictions for augmentation

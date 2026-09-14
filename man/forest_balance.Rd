@@ -18,6 +18,8 @@ forest_balance(
   scale.outcomes = TRUE,
   solver = c("auto", "direct", "cg", "bj"),
   lambda = 0,
+  kernel.response = c("joint", "treatment", "outcome"),
+  crossfit.balance = c("fold", "full"),
   tol = 1e-08,
   parallel = FALSE,
   ...
@@ -37,6 +39,8 @@ forest_balance(
 \code{max(20, min(floor(n/200) + p, floor(n/50)))}. This scales the leaf
 size with both the sample size and the number of covariates, which
 empirically yields low bias. See Details.}
+
+\item{estimand}{Target estimand: \code{"ATE"} (default), \code{"ATT"}, or \code{"ATC"}.}
 
 \item{cross.fitting}{Logical; if \code{TRUE} (default), use K-fold
 cross-fitting to construct the kernel from held-out data, reducing
@@ -73,6 +77,15 @@ details.}
 
 \item{lambda}{Nonnegative ridge penalty on the balancing weights; see
 \code{\link{kernel_balance}}. Default \code{0}.}
+
+\item{kernel.response}{Which responses the kernel-defining forest is fit to:
+\code{"joint"} (default; treatment and outcome, the proposed method),
+\code{"treatment"} (treatment only), or \code{"outcome"} (outcome only). The
+latter two exist for ablation studies.}
+
+\item{crossfit.balance}{Under cross-fitting, whether the balancing problem for fold
+\eqn{v} is solved within the fold (\code{"fold"}, default) or on the full sample with
+the kernel learned on the other folds, keeping only fold \eqn{v}'s weights (\code{"full"}).}
 
 \item{tol}{Convergence tolerance for the CG solver. Default is \code{5e-11}.}
 

@@ -24,6 +24,7 @@
 #'   back to \code{"cg"} with a warning.
 #' @param num.trees Number of trees \eqn{B}. Required when \code{Z} is
 #'   provided.
+#' @param estimand Target estimand: \code{"ATE"} (default), \code{"ATT"}, or \code{"ATC"}.
 #' @param solver Which linear solver to use. \code{"auto"} (default) selects
 #'   the best available solver based on the inputs: \code{"cg"} when \code{Z}
 #'   is available and \eqn{n > 5000}, or \code{"direct"} otherwise. See

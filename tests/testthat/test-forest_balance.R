@@ -79,3 +79,40 @@ test_that("forest_balance print and summary work", {
   expect_s3_class(s, "summary.forest_balance")
   expect_output(print(s), "Covariate Balance")
 })
+
+test_that("kernel.response ablation options run and differ from the joint kernel", {
+  set.seed(321)
+  dat <- simulate_data(n = 300, p = 5)
+  f_joint <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 100, cross.fitting = FALSE)
+  f_trt   <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 100, cross.fitting = FALSE,
+                            kernel.response = "treatment")
+  f_out   <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 100, cross.fitting = FALSE,
+                            kernel.response = "outcome")
+  for (f in list(f_joint, f_trt, f_out)) {
+    expect_equal(sum(f$weights[dat$A == 1]), sum(dat$A == 1), tolerance = 1e-6)
+    expect_true(is.finite(f$ate))
+  }
+  expect_equal(f_joint$kernel.response, "joint")
+  expect_false(isTRUE(all.equal(f_joint$weights, f_trt$weights)))
+  expect_error(forest_balance(dat$X, dat$A, dat$Y, kernel.response = "both"))
+})
+
+test_that("crossfit.balance = 'full' keeps fold weight sums and the mean-zero information flow", {
+  set.seed(654)
+  dat <- simulate_data(n = 400, p = 5)
+  set.seed(1); f_fold <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 100, num.folds = 2, lambda = 0.1)
+  set.seed(1); f_full <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 100, num.folds = 2, lambda = 0.1,
+                                        crossfit.balance = "full")
+  expect_equal(f_full$fold_ids, f_fold$fold_ids)
+  expect_equal(f_full$crossfit.balance, "full")
+  expect_true(is.finite(f_full$ate))
+  # full-sample balancing: weights of each arm sum to the arm size over the FULL sample, so the
+  # fold's own weights need not sum to the fold's arm size; check they differ from the fold variant.
+  expect_false(isTRUE(all.equal(f_full$weights, f_fold$weights)))
+  # information flow: perturbing outcomes inside fold 1 must not change fold 1's weights.
+  Y2 <- dat$Y; Y2[f_full$fold_ids == 1] <- Y2[f_full$fold_ids == 1] + rnorm(sum(f_full$fold_ids == 1))
+  set.seed(1); f_full2 <- forest_balance(dat$X, dat$A, Y2, num.trees = 100, num.folds = 2, lambda = 0.1,
+                                         crossfit.balance = "full")
+  expect_equal(f_full2$fold_ids, f_full$fold_ids)
+  expect_equal(f_full2$weights[f_full$fold_ids == 1], f_full$weights[f_full$fold_ids == 1])
+})

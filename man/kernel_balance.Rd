@@ -42,6 +42,8 @@ back to \code{"cg"} with a warning.}
 \item{num.trees}{Number of trees \eqn{B}. Required when \code{Z} is
 provided.}
 
+\item{estimand}{Target estimand: \code{"ATE"} (default), \code{"ATT"}, or \code{"ATC"}.}
+
 \item{solver}{Which linear solver to use. \code{"auto"} (default) selects
 the best available solver based on the inputs: \code{"cg"} when \code{Z}
 is available and \eqn{n > 5000}, or \code{"direct"} otherwise. See
