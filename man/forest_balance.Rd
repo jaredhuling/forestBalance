@@ -22,6 +22,7 @@ forest_balance(
   crossfit.balance = c("fold", "full"),
   tol = 1e-08,
   parallel = FALSE,
+  maxiter = 2000L,
   ...
 )
 }
@@ -96,6 +97,8 @@ value specifies the exact number of cores. Only used when
 \code{cross.fitting = TRUE}. Note: parallel processing is not supported on
 Windows.}
 
+\item{maxiter}{Maximum iterations for each iterative balancing solve. Default 2000.}
+
 \item{...}{Additional arguments passed to
 \code{\link[grf]{multi_regression_forest}}.}
 }
@@ -115,6 +118,8 @@ cross-fitting is used, these are the concatenated per-fold weights.}
 or \code{NULL} when cross-fitting or the CG solver is used.}
 \item{forest}{The trained forest object. When cross-fitting is used, this
 is the last fold's forest.}
+\item{forests}{All trained forests, one per fold.}
+\item{fold_diagnostics}{Per-fold index maps, complete balancing weights, and solver residual checks. Failed folds are errors.}
 \item{X, A, Y}{The input data.}
 \item{n, n1, n0}{Total, treated, and control sample sizes.}
 \item{solver}{The solver that was used (\code{"direct"} or \code{"cg"}).}

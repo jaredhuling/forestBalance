@@ -43,6 +43,7 @@
 #'     weights. Treated weights sum to \eqn{n_1} and control weights sum to
 #'     \eqn{n_0}.}
 #'   \item{solver}{The solver that was used.}
+#'   \item{diagnostics}{Residuals and convergence checks for every linear solve, arm-total errors, and projected KKT residuals. For positive ridge and a positive semidefinite kernel, the reported weight error bound includes the arm-total correction. Failed accuracy checks raise an error carrying diagnostics.}
 #' }
 #'
 #' @details
@@ -126,8 +127,49 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
                            tol = 1e-8, maxiter = 2000L) {
   solver <- match.arg(solver)
   estimand <- match.arg(estimand)
-  if (!is.numeric(lambda) || length(lambda) != 1L || is.na(lambda) || lambda < 0) {
+  if (!is.numeric(lambda) || length(lambda) != 1L || !is.finite(lambda) || lambda < 0) {
     stop("'lambda' must be a single nonnegative number.")
+  }
+  if (length(tol) != 1L || !is.finite(tol) || tol <= 0)
+    stop("'tol' must be finite and positive.")
+  if (length(maxiter) != 1L || !is.finite(maxiter) || maxiter < 1 || maxiter != floor(maxiter))
+    stop("'maxiter' must be a positive integer.")
+  if (any(!is.finite(trt)) || !all(trt %in% 0:1)) stop("Treatment vector must be binary (0/1).")
+  if (!is.null(Z) && (nrow(Z) != length(trt) || !.matrix_all_finite(Z)))
+    stop("Invalid Z dimensions or nonfinite entries.")
+  if (!is.null(kern) && !.matrix_all_finite(kern)) stop("Nonfinite kernel entries.")
+  if (!is.null(num.trees) && (length(num.trees) != 1L || !is.finite(num.trees) || num.trees <= 0))
+    stop("'num.trees' must be finite and positive.")
+  diagnostics <- list(solves = list(), arms = list())
+  fail <- function(message) stop(structure(list(message = message, call = NULL,
+    diagnostics = diagnostics), class = c("forest_balance_solver_error", "error", "condition")))
+  # Recompute actual residuals with the original operator. Sparse paths stay sparse.
+  audit_solve <- function(res, rhs, arm) {
+    it <- attr(res, "iters")
+    x <- as.numeric(res)
+    ix <- if (arm == "treated") which(trt == 1) else which(trt == 0)
+    op <- function(x) {
+      if (solver %in% c("cg", "bj")) {
+        za <- Z[ix, , drop = FALSE]
+        as.numeric(za %*% Matrix::crossprod(za, x)) / num.trees + lambda * x
+      } else as.numeric(kern[ix, ix, drop = FALSE] %*% x) + lambda * x
+    }
+    residual <- sqrt(sum((op(x) - rhs)^2))
+    # CG stops on an absolute B-scaled residual; BJ uses a relative residual.
+    target <- if (solver == "cg") tol / num.trees else tol * sqrt(sum(rhs^2))
+    op_bound <- if (solver %in% c("cg", "bj")) {
+      za_abs <- abs(Z[ix, , drop = FALSE])
+      max(as.numeric(za_abs %*% Matrix::colSums(za_abs))) / num.trees + lambda
+    } else max(Matrix::rowSums(abs(kern[ix, ix, drop = FALSE]))) + lambda
+    roundoff <- 100 * .Machine$double.eps * (sqrt(sum(rhs^2)) + op_bound * sqrt(sum(x^2)))
+    limit <- 10 * target + roundoff
+    ok <- all(is.finite(x)) && is.finite(residual) && residual <= limit
+    diagnostics$solves[[length(diagnostics$solves) + 1L]] <<- list(
+      arm = arm, rhs = if (all(rhs == 1)) "ones" else "target",
+      iterations = if (is.null(it)) NA_integer_ else it,
+      residual_l2 = residual, residual_limit = limit, converged = ok)
+    if (!ok) fail(paste("Linear solve did not converge for", arm, "arm."))
+    note_iters(res)
   }
   iters_env <- new.env()
   iters_env$max <- NA_integer_
@@ -213,20 +255,20 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
       # Need control solver
       if (solver == "bj") {
         solve_c0 <- .bj_pcg_solver(Z_c, leaf_matrix[idx_c, ], B, tol, maxiter, lambda)
-        solve_c <- function(rhs) note_iters(solve_c0(rhs))
+        solve_c <- function(rhs) audit_solve(solve_c0(rhs), rhs, "control")
       } else {
         Z_c_csc <- as(Z_c, "dgCMatrix")
-        solve_c <- function(rhs) note_iters(cg_solve_cpp(Z_c_csc, B * rhs, tol, maxiter, B * lambda))
+        solve_c <- function(rhs) audit_solve(cg_solve_cpp(Z_c_csc, B * rhs, tol, maxiter, B * lambda), rhs, "control")
       }
     }
     if (estimand != "ATT") {
       # Need treated solver
       if (solver == "bj") {
         solve_t0 <- .bj_pcg_solver(Z_t, leaf_matrix[idx_t, ], B, tol, maxiter, lambda)
-        solve_t <- function(rhs) note_iters(solve_t0(rhs))
+        solve_t <- function(rhs) audit_solve(solve_t0(rhs), rhs, "treated")
       } else {
         Z_t_csc <- as(Z_t, "dgCMatrix")
-        solve_t <- function(rhs) note_iters(cg_solve_cpp(Z_t_csc, B * rhs, tol, maxiter, B * lambda))
+        solve_t <- function(rhs) audit_solve(cg_solve_cpp(Z_t_csc, B * rhs, tol, maxiter, B * lambda), rhs, "treated")
       }
     }
 
@@ -265,19 +307,19 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
       b_t <- b[idx_t]
       b_c <- b[idx_c]
     } else if (estimand == "ATT") {
-      b_c <- as.numeric(kern[idx_c, idx_t] %*% ones_t) / (n0 * n1)
+      b_c <- as.numeric(kern[idx_c, idx_t, drop = FALSE] %*% ones_t) / (n0 * n1)
     } else {
-      b_t <- as.numeric(kern[idx_t, idx_c] %*% ones_c) / (n1 * n0)
+      b_t <- as.numeric(kern[idx_t, idx_c, drop = FALSE] %*% ones_c) / (n1 * n0)
     }
 
     # Solve each block
     if (estimand == "ATT") {
       w_t <- ones_t
     } else {
-      K_tt <- kern[idx_t, idx_t]
+      K_tt <- kern[idx_t, idx_t, drop = FALSE]
       if (lambda > 0) K_tt <- K_tt + lambda * Matrix::Diagonal(n1)
-      s1 <- as.numeric(solve(K_tt, ones_t))
-      sb <- as.numeric(solve(K_tt, b_t))
+      s1 <- audit_solve(solve(K_tt, ones_t), ones_t, "treated")
+      sb <- audit_solve(solve(K_tt, b_t), b_t, "treated")
       X11 <- n1^2 * sum(s1); YY1 <- n1^2 * sum(sb) - n1
       w_t <- n1^2 * (sb - (YY1 / X11) * s1)
     }
@@ -285,22 +327,50 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
     if (estimand == "ATC") {
       w_c <- ones_c
     } else {
-      K_cc <- kern[idx_c, idx_c]
+      K_cc <- kern[idx_c, idx_c, drop = FALSE]
       if (lambda > 0) K_cc <- K_cc + lambda * Matrix::Diagonal(n0)
-      s1 <- as.numeric(solve(K_cc, ones_c))
-      sb <- as.numeric(solve(K_cc, b_c))
+      s1 <- audit_solve(solve(K_cc, ones_c), ones_c, "control")
+      sb <- audit_solve(solve(K_cc, b_c), b_c, "control")
       X22 <- n0^2 * sum(s1); YY2 <- n0^2 * sum(sb) - n0
       w_c <- n0^2 * (sb - (YY2 / X22) * s1)
     }
   }
 
+  # Projected KKT residual also checks amplification of the small target solve.
+  for (a in c("treated", "control")) {
+    ix <- if (a == "treated") idx_t else idx_c
+    wa <- if (a == "treated") w_t else w_c
+    na <- length(ix)
+    fixed <- (estimand == "ATT" && a == "treated") || (estimand == "ATC" && a == "control")
+    mass_error <- abs(sum(wa) - na)
+    if (!all(is.finite(wa)) || mass_error > 1e-7 * na) fail("Invalid arm weights or arm total.")
+    if (!fixed) {
+      ba <- if (a == "treated") b_t else b_c
+      feasible_w <- wa + (na - sum(wa)) / na
+      if (solver %in% c("cg", "bj")) {
+        za <- Z[ix, , drop = FALSE]
+        grad <- as.numeric(za %*% Matrix::crossprod(za, feasible_w))/num.trees + lambda * feasible_w - na^2 * ba
+      } else grad <- as.numeric(kern[ix, ix, drop = FALSE] %*% feasible_w) + lambda * feasible_w - na^2 * ba
+      projected <- sqrt(sum((grad - mean(grad))^2))
+      bound <- if (lambda > 0) projected / lambda + mass_error / sqrt(na) else NA_real_
+      # For PSD kernels and positive ridge this bounds distance to the constrained
+      # optimum, after the negligible recorded arm-total error is accounted for.
+      error_limit <- 1e-5 * (1 + sqrt(sum(wa^2)))
+
+    } else { projected <- 0; bound <- 0; error_limit <- 0 }
+    diagnostics$arms[[a]] <- list(mass_error = mass_error,
+      projected_residual_l2 = projected, weight_error_bound = bound,
+      weight_error_limit = error_limit)
+    if (!is.finite(projected) || (lambda > 0 && bound > error_limit))
+      fail("Final weight KKT accuracy check failed.")
+  }
   # Reassemble
   w <- numeric(n)
   w[idx_t] <- w_t
   w[idx_c] <- w_c
 
   list(weights = w, solver = solver, estimand = estimand, lambda = lambda,
-       iters = iters_env$max)
+       iters = iters_env$max, diagnostics = diagnostics)
 }
 
 
@@ -370,3 +440,10 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
 
 
 # Note: Plain CG solver is implemented in C++ (src/cg_solve.cpp) as cg_solve_cpp().
+
+# Avoid densifying sparse matrices when implicit zeros are necessarily finite.
+.matrix_all_finite <- function(x) {
+  if (inherits(x, "sparseMatrix")) {
+    if ("x" %in% methods::slotNames(x)) all(is.finite(methods::slot(x, "x"))) else TRUE
+  } else all(is.finite(x))
+}

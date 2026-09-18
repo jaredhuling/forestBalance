@@ -54,6 +54,7 @@
 #'   \eqn{v} is solved within the fold (\code{"fold"}, default) or on the full sample with
 #'   the kernel learned on the other folds, keeping only fold \eqn{v}'s weights (\code{"full"}).
 #' @param tol Convergence tolerance for the CG solver. Default is \code{5e-11}.
+#' @param maxiter Maximum iterations for each iterative balancing solve. Default 2000.
 #' @param parallel Logical or integer. If \code{FALSE} (default), folds are
 #'   processed sequentially. If \code{TRUE}, folds are processed in parallel
 #'   using all available cores via \code{\link[parallel]{mclapply}}. An integer
@@ -78,6 +79,8 @@
 #'     or \code{NULL} when cross-fitting or the CG solver is used.}
 #'   \item{forest}{The trained forest object. When cross-fitting is used, this
 #'     is the last fold's forest.}
+#'   \item{forests}{All trained forests, one per fold.}
+#'   \item{fold_diagnostics}{Per-fold index maps, complete balancing weights, and solver residual checks. Failed folds are errors.}
 #'   \item{X, A, Y}{The input data.}
 #'   \item{n, n1, n0}{Total, treated, and control sample sizes.}
 #'   \item{solver}{The solver that was used (\code{"direct"} or \code{"cg"}).}
@@ -176,6 +179,7 @@ forest_balance <- function(X, A, Y,
                            crossfit.balance = c("fold", "full"),
                            tol = 1e-8,
                            parallel = FALSE,
+                           maxiter = 2000L,
                            ...) {
   solver <- match.arg(solver)
   kernel.response <- match.arg(kernel.response)
@@ -195,11 +199,11 @@ forest_balance <- function(X, A, Y,
   if (cross.fitting) {
     result <- .fit_crossfitted(X, A, Y, num.trees, min.node.size, num.folds,
                                augmented, mu.hat, scale.outcomes, estimand,
-                               solver, lambda, kernel.response, crossfit.balance, tol, parallel, ...)
+                               solver, lambda, kernel.response, crossfit.balance, tol, parallel, maxiter = maxiter, ...)
   } else {
     result <- .fit_full_sample(X, A, Y, num.trees, min.node.size,
                                augmented, mu.hat, scale.outcomes, estimand,
-                               solver, lambda, kernel.response, tol, ...)
+                               solver, lambda, kernel.response, tol, maxiter = maxiter, ...)
   }
 
   out <- c(result, list(
@@ -229,12 +233,14 @@ forest_balance <- function(X, A, Y,
 #' Validate inputs to forest_balance
 #' @noRd
 .validate_inputs <- function(X, A, Y, mu.hat, cross.fitting, num.folds, n) {
+  if (!is.numeric(X) || any(!is.finite(X)) || any(!is.finite(Y))) stop("X and Y must be finite numeric data.")
   if (length(A) != n || length(Y) != n) {
     stop("X, A, and Y must have the same number of observations.")
   }
   if (!all(A %in% c(0, 1))) {
     stop("Treatment vector A must be binary (0/1).")
   }
+  if (length(unique(A)) != 2L) stop("Both treatment arms are required.")
   if (!is.null(mu.hat)) {
     if (!is.list(mu.hat) || is.null(mu.hat$mu1) || is.null(mu.hat$mu0)) {
       stop("mu.hat must be a list with components 'mu1' and 'mu0'.")
@@ -247,7 +253,7 @@ forest_balance <- function(X, A, Y,
               "Ensure predictions were cross-fitted externally.")
     }
   }
-  if (cross.fitting && (num.folds < 2 || num.folds > n)) {
+  if (cross.fitting && (length(num.folds) != 1L || !is.finite(num.folds) || num.folds != floor(num.folds) || num.folds < 2 || num.folds > n)) {
     stop("num.folds must be between 2 and n.")
   }
 }
@@ -275,14 +281,19 @@ forest_balance <- function(X, A, Y,
                                     X_pred, A_pred,
                                     num.trees, min.node.size,
                                     scale.outcomes, estimand, solver, lambda, tol,
-                                    kernel.response = "joint", ...) {
+                                    kernel.response = "joint", maxiter = 2000L, ...) {
   # Train the forest whose leaves define the kernel: on (A, Y) jointly (the proposed
   # method), or on A alone or Y alone for the kernel ablation.
   response <- switch(kernel.response,
                      joint = cbind(A_train, Y_train),
                      treatment = cbind(A_train),
                      outcome = cbind(Y_train))
-  if (scale.outcomes) response <- scale(response)
+  if (scale.outcomes) {
+    # Preserve the original standardization exactly for nonconstant responses.
+    constant <- apply(response, 2, stats::sd) == 0
+    response <- scale(response)
+    if (any(constant)) response[, constant] <- 0
+  }
 
   forest <- grf::multi_regression_forest(
     X_train, Y = response,
@@ -298,12 +309,12 @@ forest_balance <- function(X, A, Y,
     Z <- leaf_node_kernel_Z(leaf_mat)
     bal <- kernel_balance(trt = A_pred, Z = Z, leaf_matrix = leaf_mat,
                           num.trees = num.trees, estimand = estimand,
-                          solver = eff_solver, lambda = lambda, tol = tol)
+                          solver = eff_solver, lambda = lambda, tol = tol, maxiter = maxiter)
     K <- NULL
   } else {
     K <- leaf_node_kernel(leaf_mat)
     bal <- kernel_balance(trt = A_pred, kern = K, estimand = estimand,
-                          solver = "direct", lambda = lambda)
+                          solver = "direct", lambda = lambda, tol = tol, maxiter = maxiter)
     Z <- NULL
   }
 
@@ -312,7 +323,7 @@ forest_balance <- function(X, A, Y,
 
   list(weights = bal$weights, forest = forest,
        solver = bal$solver, kernel = K,
-       leaf_counts = leaf_counts, cg_iters = bal$iters)
+       leaf_counts = leaf_counts, cg_iters = bal$iters, diagnostics = bal$diagnostics)
 }
 
 
@@ -342,6 +353,13 @@ forest_balance <- function(X, A, Y,
 #' @noRd
 .compute_ate <- function(Y, A, w, augmented, estimand = "ATE",
                          mu1 = NULL, mu0 = NULL) {
+  if (any(!is.finite(w)) || any(!is.finite(Y))) stop("Nonfinite weights or outcomes.")
+  for (a in 0:1) {
+    wa <- w[A == a]
+    if (!length(wa) || sum(wa) <= 100 * .Machine$double.eps * max(1, sum(abs(wa))))
+      stop("Nonpositive or numerically unresolved retained arm mass.")
+  }
+  if (augmented && (any(!is.finite(mu1)) || any(!is.finite(mu0)))) stop("Nonfinite outcome predictions.")
   if (estimand == "ATT") {
     if (augmented) {
       # DR-ATT: regression on treated + bias corrections
@@ -389,11 +407,8 @@ forest_balance <- function(X, A, Y,
 
   A_k <- A[idx_k]; Y_k <- Y[idx_k]
 
-  # Skip if a treatment group is empty in this fold
-  if (sum(A_k == 1) == 0 || sum(A_k == 0) == 0) {
-    return(list(idx = idx_k, ate = NA, weights = rep(NA, length(idx_k)),
-                mu1 = NULL, mu0 = NULL, forest = NULL, solver = NULL))
-  }
+  if (length(unique(A_k)) != 2L || length(unique(A[idx_notk])) != 2L)
+    stop("Empty training/evaluation arm in fold ", k, "; fold deletion is prohibited.")
 
   # Fit the kernel on the other folds. With crossfit.balance = "fold" the balancing problem is
   # solved within fold k only; with "full" it is solved on the full sample using that kernel and
@@ -434,7 +449,9 @@ forest_balance <- function(X, A, Y,
   list(idx = idx_k, ate = ate_k, weights = w_k,
        mu1 = mu1_k, mu0 = mu0_k,
        forest = kb$forest, solver = kb$solver,
-       leaf_counts = kb$leaf_counts, cg_iters = kb$cg_iters)
+       leaf_counts = kb$leaf_counts, cg_iters = kb$cg_iters,
+       diagnostics = kb$diagnostics, balance_weights = kb$weights,
+       train_idx = idx_notk, balance_idx = if (full_bal) seq_along(A) else idx_k)
 }
 
 
@@ -442,7 +459,7 @@ forest_balance <- function(X, A, Y,
 #' @noRd
 .fit_crossfitted <- function(X, A, Y, num.trees, min.node.size, num.folds,
                              augmented, mu.hat, scale.outcomes, estimand,
-                             solver, lambda, kernel.response, crossfit.balance, tol, parallel, ...) {
+                             solver, lambda, kernel.response, crossfit.balance, tol, parallel, maxiter = 2000L, ...) {
   n <- nrow(X)
   fold_ids <- sample(rep(seq_len(num.folds), length.out = n))
 
@@ -461,7 +478,7 @@ forest_balance <- function(X, A, Y,
                     augmented = augmented, mu.hat = mu.hat,
                     scale.outcomes = scale.outcomes, estimand = estimand,
                     solver = solver, lambda = lambda, kernel.response = kernel.response,
-                    tol = tol, crossfit.balance = crossfit.balance, ...)
+                    tol = tol, crossfit.balance = crossfit.balance, maxiter = maxiter, ...)
 
   run_fold <- function(k) {
     do.call(.fit_one_fold, c(list(k = k), fold_args))
@@ -486,6 +503,8 @@ forest_balance <- function(X, A, Y,
 
   for (k in seq_len(num.folds)) {
     res_k <- fold_results[[k]]
+    if (inherits(res_k, "try-error") || !is.list(res_k) || length(res_k$ate) != 1L || !is.finite(res_k$ate))
+      stop("Cross-fitting failed in fold ", k, "; fold deletion is prohibited.")
     fold_ates[k] <- res_k$ate
     weights[res_k$idx] <- res_k$weights
     if (!is.null(res_k$leaf_counts)) leaf_counts[[k]] <- res_k$leaf_counts
@@ -507,7 +526,7 @@ forest_balance <- function(X, A, Y,
   }
 
   list(
-    ate       = mean(fold_ates, na.rm = TRUE),
+    ate       = mean(fold_ates),
     weights   = weights,
     mu1.hat   = mu1_hat,
     mu0.hat   = mu0_hat,
@@ -515,6 +534,8 @@ forest_balance <- function(X, A, Y,
     fold_ids  = fold_ids,
     kernel    = NULL,
     forest    = last_forest,
+    forests   = lapply(fold_results, `[[`, "forest"),
+    fold_diagnostics = lapply(fold_results, function(x) x[c("idx", "train_idx", "balance_idx", "balance_weights", "diagnostics", "solver")]),
     solver    = last_solver,
     num.folds = num.folds,
     leaf_counts = leaf_counts,
@@ -561,6 +582,9 @@ forest_balance <- function(X, A, Y,
     mu0.hat = mu0_hat,
     kernel  = kb$kernel,
     forest  = kb$forest,
+    forests = list(kb$forest),
+    fold_diagnostics = list(list(idx = seq_len(n), train_idx = seq_len(n),
+      balance_idx = seq_len(n), balance_weights = kb$weights, diagnostics = kb$diagnostics, solver = kb$solver)),
     solver  = kb$solver,
     leaf_counts = kb$leaf_counts,
     cg_iters = kb$cg_iters

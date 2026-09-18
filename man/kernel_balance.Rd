@@ -66,6 +66,7 @@ A list with the following elements:
 weights. Treated weights sum to \eqn{n_1} and control weights sum to
 \eqn{n_0}.}
 \item{solver}{The solver that was used.}
+\item{diagnostics}{Residuals and convergence checks for every linear solve, arm-total errors, and projected KKT residuals. For positive ridge and a positive semidefinite kernel, the reported weight error bound includes the arm-total correction. Failed accuracy checks raise an error carrying diagnostics.}
 }
 }
 \description{
