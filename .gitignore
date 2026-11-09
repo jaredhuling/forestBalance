@@ -17,3 +17,6 @@ README.html
 vignettes/*_cache/
 vignettes/*_files/
 vignettes/*.html
+# Only GitHub Actions workflows are tracked in .github
+.github/*
+!.github/workflows/
