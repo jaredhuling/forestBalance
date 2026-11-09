@@ -8,9 +8,14 @@
 
 ## Test environments
 
-* local macOS Sequoia (R 4.5.1)
+* local macOS Sequoia (R 4.5.1), also against the development RcppEigen
+  (0.4.9.9-5, Eigen 5.0.1)
+* R-hub: linux (R-devel), windows (R-devel), macos-arm64 (R-devel), clang-asan
+* win-builder: R-devel (2026-11-07 r90850) and R-release (4.6.2)
 
 ## R CMD check results
 
-0 errors | 0 warnings | 2 notes (local environment only: the current time could not be
-verified, and the local HTML Tidy is too old for manual validation)
+R-hub and win-builder: 0 errors | 0 warnings | 0 notes.
+
+Local check: 0 errors | 0 warnings | 2 notes, both from the local environment (the current
+time could not be verified, and the local HTML Tidy is too old for manual validation).
