@@ -18,3 +18,4 @@
 ^_pkgdown\.yml$
 ^docs$
 ^figure$
+^CRAN-SUBMISSION$
