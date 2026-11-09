@@ -6,7 +6,7 @@
 // [[Rcpp::export]]
 Rcpp::NumericVector cg_solve_cpp(Rcpp::S4 Z_s4, Rcpp::NumericVector rhs_r,
                                   double tol, int maxiter, double ridge) {
-  const Eigen::MappedSparseMatrix<double> Z(Rcpp::as<Eigen::MappedSparseMatrix<double> >(Z_s4));
+  const Eigen::Map<Eigen::SparseMatrix<double>> Z(Rcpp::as<Eigen::Map<Eigen::SparseMatrix<double>> >(Z_s4)); 
   const Eigen::Map<Eigen::VectorXd> rhs(rhs_r.begin(), rhs_r.size());
 
   int n = Z.rows();
