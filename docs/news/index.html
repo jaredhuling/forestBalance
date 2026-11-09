@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">forestBalance</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -39,7 +39,31 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.1.0" id="forestbalance-010">forestBalance 0.1.0<a class="anchor" aria-label="anchor" href="#forestbalance-010"></a></h2>
+<h2 class="pkg-version" data-toc-text="0.1.1" id="forestbalance-011">forestBalance 0.1.1<a class="anchor" aria-label="anchor" href="#forestbalance-011"></a></h2>
+<div class="section level3">
+<h3 id="new-features-0-1-1">New features<a class="anchor" aria-label="anchor" href="#new-features-0-1-1"></a></h3>
+<ul><li><p><code><a href="../reference/forest_balance.html">forest_balance()</a></code> and <code><a href="../reference/kernel_balance.html">kernel_balance()</a></code> gain <code>estimand = c("ATE", "ATT", "ATC")</code>.</p></li>
+<li><p>Optional ridge penalty <code>lambda</code> (default 0) in all solver paths.</p></li>
+<li><p><code>kernel.response = c("joint", "treatment", "outcome")</code> selects the responses used to grow the kernel forest.</p></li>
+<li><p><code>crossfit.balance = c("fold", "full")</code> chooses whether cross-fitted weights are solved on the evaluation fold or on the full sample with the held-out forest.</p></li>
+<li><p>New <code>maxiter</code> argument for the conjugate gradient solver. Fits now return leaf counts, solver iteration counts, and diagnostics for every linear solve (residuals, arm totals, and projected KKT residuals).</p></li>
+</ul></div>
+<div class="section level3">
+<h3 id="changes-in-behavior-0-1-1">Changes in behavior<a class="anchor" aria-label="anchor" href="#changes-in-behavior-0-1-1"></a></h3>
+<ul><li><p>The default ridge penalty is now <code>lambda = 0.1</code> in <code><a href="../reference/forest_balance.html">forest_balance()</a></code> and <code><a href="../reference/kernel_balance.html">kernel_balance()</a></code>. Without a ridge, the kernel block of an arm is singular when units share leaves in nearly every tree (for example, with a binary outcome and many covariates), and the balancing weights are then not determined.</p></li>
+<li><p>A numerically singular kernel block now raises an informative error instead of returning arbitrary weights or failing with a generic message, and an ill-conditioned block (condition number above about 10^6) gives a warning that the weights can be extreme. Because kernel entries lie in [0, 1], the condition number of an arm block of size <code>n_a</code> is at most <code>1 + n_a / lambda</code>, so with the default ridge the warning requires an arm of more than about 100,000 units.</p></li>
+<li><p>The target linear solve now uses the right-hand side <code>n_a^2 b_a</code> directly instead of rescaling its solution by <code>n_a^2</code>, so solver error is no longer amplified by the squared arm size. A small positive <code>lambda</code> with the iterative solvers at large <code>n</code> no longer fails the final accuracy check. Weights are mathematically unchanged.</p></li>
+<li><p>The block Jacobi solver (<code>solver = "bj"</code>) now stops on the same absolute residual criterion as the conjugate gradient solver. Its relative criterion left errors that grew with the target right-hand side and failed the final accuracy check under a positive <code>lambda</code> at large <code>n</code>.</p></li>
+<li><p>Failed linear solves or failed weight accuracy checks now raise an error carrying the diagnostics; version 0.1.0 returned weights without these checks. Cross-fitted estimates no longer drop failed folds when averaging.</p></li>
+</ul></div>
+<div class="section level3">
+<h3 id="compatibility-0-1-1">Compatibility<a class="anchor" aria-label="anchor" href="#compatibility-0-1-1"></a></h3>
+<ul><li>
+<code>src/cg_solve.cpp</code> uses <code>Map&lt;SparseMatrix&gt;</code> for compatibility with Eigen 5 (thanks to Dirk Eddelbuettel, <a href="https://github.com/jaredhuling/forestBalance/issues/1" class="external-link">#1</a>).</li>
+</ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.1.0" id="forestbalance-010">forestBalance 0.1.0<a class="anchor" aria-label="anchor" href="#forestbalance-010"></a></h2><p class="text-muted">CRAN release: 2026-04-07</p>
 <p>Initial release.</p>
 <div class="section level3">
 <h3 id="features-0-1-0">Features<a class="anchor" aria-label="anchor" href="#features-0-1-0"></a></h3>

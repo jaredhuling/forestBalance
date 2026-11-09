@@ -1,6 +1,72 @@
 # Changelog
 
+## forestBalance 0.1.1
+
+### New features
+
+- [`forest_balance()`](https://jaredhuling.github.io/forestBalance/reference/forest_balance.md)
+  and
+  [`kernel_balance()`](https://jaredhuling.github.io/forestBalance/reference/kernel_balance.md)
+  gain `estimand = c("ATE", "ATT", "ATC")`.
+
+- Optional ridge penalty `lambda` (default 0) in all solver paths.
+
+- `kernel.response = c("joint", "treatment", "outcome")` selects the
+  responses used to grow the kernel forest.
+
+- `crossfit.balance = c("fold", "full")` chooses whether cross-fitted
+  weights are solved on the evaluation fold or on the full sample with
+  the held-out forest.
+
+- New `maxiter` argument for the conjugate gradient solver. Fits now
+  return leaf counts, solver iteration counts, and diagnostics for every
+  linear solve (residuals, arm totals, and projected KKT residuals).
+
+### Changes in behavior
+
+- The default ridge penalty is now `lambda = 0.1` in
+  [`forest_balance()`](https://jaredhuling.github.io/forestBalance/reference/forest_balance.md)
+  and
+  [`kernel_balance()`](https://jaredhuling.github.io/forestBalance/reference/kernel_balance.md).
+  Without a ridge, the kernel block of an arm is singular when units
+  share leaves in nearly every tree (for example, with a binary outcome
+  and many covariates), and the balancing weights are then not
+  determined.
+
+- A numerically singular kernel block now raises an informative error
+  instead of returning arbitrary weights or failing with a generic
+  message, and an ill-conditioned block (condition number above about
+  10^6) gives a warning that the weights can be extreme. Because kernel
+  entries lie in \[0, 1\], the condition number of an arm block of size
+  `n_a` is at most `1 + n_a / lambda`, so with the default ridge the
+  warning requires an arm of more than about 100,000 units.
+
+- The target linear solve now uses the right-hand side `n_a^2 b_a`
+  directly instead of rescaling its solution by `n_a^2`, so solver error
+  is no longer amplified by the squared arm size. A small positive
+  `lambda` with the iterative solvers at large `n` no longer fails the
+  final accuracy check. Weights are mathematically unchanged.
+
+- The block Jacobi solver (`solver = "bj"`) now stops on the same
+  absolute residual criterion as the conjugate gradient solver. Its
+  relative criterion left errors that grew with the target right-hand
+  side and failed the final accuracy check under a positive `lambda` at
+  large `n`.
+
+- Failed linear solves or failed weight accuracy checks now raise an
+  error carrying the diagnostics; version 0.1.0 returned weights without
+  these checks. Cross-fitted estimates no longer drop failed folds when
+  averaging.
+
+### Compatibility
+
+- `src/cg_solve.cpp` uses `Map<SparseMatrix>` for compatibility with
+  Eigen 5 (thanks to Dirk Eddelbuettel,
+  [\#1](https://github.com/jaredhuling/forestBalance/issues/1)).
+
 ## forestBalance 0.1.0
+
+CRAN release: 2026-04-07
 
 Initial release.
 

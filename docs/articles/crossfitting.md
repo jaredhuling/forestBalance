@@ -44,8 +44,8 @@ for (r in seq_len(nreps)) {
 
 | Method         |   Bias |     SD |   RMSE |
 |:---------------|-------:|-------:|-------:|
-| No CF (mns=10) | 0.1912 | 0.0288 | 0.1934 |
-| CF (default)   | 0.0021 | 0.0314 | 0.0315 |
+| No CF (mns=10) | 0.1999 | 0.0255 | 0.2015 |
+| CF (default)   | 0.0149 | 0.0248 | 0.0289 |
 | Oracle IPW     | 0.0228 | 0.0149 | 0.0272 |
 
 n = 5,000, p = 50, true ATE = 0, 2 replications.
@@ -143,12 +143,12 @@ heuristic <- max(20, min(floor(n / 200) + p, floor(n / 50)))
 
 | min.node.size |    Bias |     SD |   RMSE |     |
 |--------------:|--------:|-------:|-------:|:----|
-|             5 |  0.1716 | 0.0134 | 0.1721 |     |
-|            10 |  0.1017 | 0.0015 | 0.1017 |     |
-|            20 |  0.0153 | 0.0447 | 0.0472 |     |
-|            50 |  0.0481 | 0.0063 | 0.0485 |     |
-|            75 | -0.0099 | 0.0351 | 0.0364 | \<– |
-|           100 |  0.0332 | 0.0007 | 0.0332 |     |
+|             5 |  0.1865 | 0.0111 | 0.1868 |     |
+|            10 |  0.1141 | 0.0051 | 0.1143 |     |
+|            20 |  0.0226 | 0.0463 | 0.0515 |     |
+|            50 |  0.0511 | 0.0026 | 0.0511 |     |
+|            75 | -0.0020 | 0.0409 | 0.0409 | \<– |
+|           100 |  0.0246 | 0.0088 | 0.0261 |     |
 
 Cross-fitted estimator (n = 5,000, p = 50, 2 reps). Arrow marks the
 adaptive default (mns = 75).
@@ -168,11 +168,12 @@ fit
 #> -------------------------------------------------- 
 #>   n = 2,000  (n_treated = 745, n_control = 1255)
 #>   Trees: 1000
+#>   Estimand: ATE
 #>   Cross-fitting: 2 folds
 #>   Solver: direct
-#>   ATE estimate: -0.0315
-#>   Fold ATEs: -0.0808, 0.0177
-#>   ESS: treated = 529/745 (71%)   control = 878/1255 (70%)
+#>   ATE estimate: -0.0203
+#>   Fold ATEs: -0.0585, 0.0179
+#>   ESS: treated = 559/745 (75%)   control = 933/1255 (74%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
 ```
@@ -186,9 +187,10 @@ fit_nocf
 #> -------------------------------------------------- 
 #>   n = 2,000  (n_treated = 745, n_control = 1255)
 #>   Trees: 1000
+#>   Estimand: ATE
 #>   Solver: direct
-#>   ATE estimate: -0.0215
-#>   ESS: treated = 459/745 (62%)   control = 759/1255 (60%)
+#>   ATE estimate: -0.0211
+#>   ESS: treated = 492/745 (66%)   control = 819/1255 (65%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
 ```
@@ -202,11 +204,12 @@ fit_custom
 #> -------------------------------------------------- 
 #>   n = 2,000  (n_treated = 745, n_control = 1255)
 #>   Trees: 1000
+#>   Estimand: ATE
 #>   Cross-fitting: 2 folds
 #>   Solver: direct
-#>   ATE estimate: -0.0784
-#>   Fold ATEs: -0.0918, -0.065
-#>   ESS: treated = 424/745 (57%)   control = 739/1255 (59%)
+#>   ATE estimate: -0.0608
+#>   Fold ATEs: -0.0556, -0.0659
+#>   ESS: treated = 539/745 (72%)   control = 930/1255 (74%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
 ```
@@ -238,10 +241,10 @@ fold_res <- do.call(rbind, lapply(c(2, 3, 5, 10), function(nfolds) {
 
 | Folds |   Bias |     SD |   RMSE |
 |------:|-------:|-------:|-------:|
-|     2 | 0.0907 | 0.0456 | 0.1015 |
-|     3 | 0.0246 | 0.0275 | 0.0369 |
-|     5 | 0.1025 | 0.0096 | 0.1030 |
-|    10 | 0.2065 | 0.1269 | 0.2424 |
+|     2 | 0.0940 | 0.0436 | 0.1036 |
+|     3 | 0.0355 | 0.0235 | 0.0426 |
+|     5 | 0.1174 | 0.0069 | 0.1176 |
+|    10 | 0.2355 | 0.1246 | 0.2665 |
 
 Effect of number of folds (n = 5,000, adaptive leaf size).
 

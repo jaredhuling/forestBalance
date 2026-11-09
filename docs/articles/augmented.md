@@ -52,7 +52,7 @@ fit_aug <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 500,
 
 c("Standard" = fit$ate, "Augmented" = fit_aug$ate, "Truth" = 0)
 #>   Standard  Augmented      Truth 
-#> 0.01664814 0.06350369 0.00000000
+#> 0.04603901 0.07942330 0.00000000
 ```
 
 The `print` method indicates when augmentation is active:
@@ -63,12 +63,13 @@ fit_aug
 #> -------------------------------------------------- 
 #>   n = 2,000  (n_treated = 1042, n_control = 958)
 #>   Trees: 500
+#>   Estimand: ATE
 #>   Cross-fitting: 2 folds
 #>   Augmented: yes (doubly-robust)
 #>   Solver: direct
-#>   ATE estimate: 0.0635
-#>   Fold ATEs: 0.0898, 0.0372
-#>   ESS: treated = 795/1042 (76%)   control = 712/958 (74%)
+#>   ATE estimate: 0.0794
+#>   Fold ATEs: 0.115, 0.0439
+#>   ESS: treated = 852/1042 (82%)   control = 759/958 (79%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
 ```
@@ -126,10 +127,10 @@ for (r in seq_len(nreps)) {
 
 | Method   |   Bias |     SD |   RMSE |
 |:---------|-------:|-------:|-------:|
-| Standard | 0.1204 | 0.0437 | 0.1281 |
-| CF only  | 0.0151 | 0.0673 | 0.0690 |
-| Aug only | 0.0515 | 0.0535 | 0.0743 |
-| CF + Aug | 0.0055 | 0.0609 | 0.0611 |
+| Standard | 0.1293 | 0.0450 | 0.1369 |
+| CF only  | 0.0193 | 0.0683 | 0.0710 |
+| Aug only | 0.0528 | 0.0541 | 0.0756 |
+| CF + Aug | 0.0086 | 0.0628 | 0.0634 |
 
 DGP 2: n = 5,000, p = 20, true ATE = 0, 5 reps.
 
@@ -168,12 +169,13 @@ fit_custom
 #> -------------------------------------------------- 
 #>   n = 1,000  (n_treated = 505, n_control = 495)
 #>   Trees: 500
+#>   Estimand: ATE
 #>   Cross-fitting: 2 folds
 #>   Augmented: yes (doubly-robust)
 #>   Solver: direct
-#>   ATE estimate: 0.1576
-#>   Fold ATEs: 0.2724, 0.0428
-#>   ESS: treated = 391/505 (77%)   control = 380/495 (77%)
+#>   ATE estimate: 0.1610
+#>   Fold ATEs: 0.307, 0.0151
+#>   ESS: treated = 415/505 (82%)   control = 402/495 (81%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
 ```

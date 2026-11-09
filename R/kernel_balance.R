@@ -32,7 +32,10 @@
 #' @param lambda Nonnegative ridge penalty on the weights. The group-\eqn{a} problem
 #'   solved is \eqn{\tfrac12 \| \sum_{i \in S_a} w_i K(X_i,\cdot) - n_a P_n \|^2 + \tfrac{\lambda}{2}\|w_a\|^2}
 #'   subject to \eqn{\sum_{i \in S_a} w_i = n_a}, whose KKT system is
-#'   \eqn{(K_{aa} + \lambda I) w_a = b_a + \gamma_a 1}. Default \code{0} (no ridge).
+#'   \eqn{(K_{aa} + \lambda I) w_a = b_a + \gamma_a 1}. Default \code{0.1}. The ridge makes
+#'   the weights unique when the kernel block is singular, which happens when several units
+#'   share leaves in nearly every tree. With \code{lambda = 0} a numerically singular block
+#'   raises an error.
 #' @param tol Convergence tolerance for iterative solvers. Default is
 #'   \code{1e-8}.
 #' @param maxiter Maximum iterations for iterative solvers. Default is 2000.
@@ -123,7 +126,7 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
                            num.trees = NULL,
                            estimand = c("ATE", "ATT", "ATC"),
                            solver = c("auto", "direct", "cg", "bj"),
-                           lambda = 0,
+                           lambda = 0.1,
                            tol = 1e-8, maxiter = 2000L) {
   solver <- match.arg(solver)
   estimand <- match.arg(estimand)
@@ -147,32 +150,72 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
   audit_solve <- function(res, rhs, arm) {
     it <- attr(res, "iters")
     x <- as.numeric(res)
-    ix <- if (arm == "treated") which(trt == 1) else which(trt == 0)
+    blk <- arm_block(arm)
     op <- function(x) {
       if (solver %in% c("cg", "bj")) {
-        za <- Z[ix, , drop = FALSE]
-        as.numeric(za %*% Matrix::crossprod(za, x)) / num.trees + lambda * x
-      } else as.numeric(kern[ix, ix, drop = FALSE] %*% x) + lambda * x
+        as.numeric(blk$m %*% Matrix::crossprod(blk$m, x)) / num.trees + lambda * x
+      } else as.numeric(blk$m %*% x) + lambda * x
     }
-    residual <- sqrt(sum((op(x) - rhs)^2))
-    # CG stops on an absolute B-scaled residual; BJ uses a relative residual.
-    target <- if (solver == "cg") tol / num.trees else tol * sqrt(sum(rhs^2))
-    op_bound <- if (solver %in% c("cg", "bj")) {
-      za_abs <- abs(Z[ix, , drop = FALSE])
-      max(as.numeric(za_abs %*% Matrix::colSums(za_abs))) / num.trees + lambda
-    } else max(Matrix::rowSums(abs(kern[ix, ix, drop = FALSE]))) + lambda
+    opx <- op(x)
+    residual <- sqrt(sum((opx - rhs)^2))
+    # CG and BJ stop on an absolute B-scaled residual.
+    target <- if (solver %in% c("cg", "bj")) tol / num.trees else tol * sqrt(sum(rhs^2))
+    op_bound <- blk$row_bound + lambda
     roundoff <- 100 * .Machine$double.eps * (sqrt(sum(rhs^2)) + op_bound * sqrt(sum(x^2)))
     limit <- 10 * target + roundoff
     ok <- all(is.finite(x)) && is.finite(residual) && residual <= limit
+    # Lower bound on the condition number of the (ridged) arm block: its largest eigenvalue
+    # is at least the Rayleigh quotient at the constant vector, and its smallest eigenvalue
+    # is at most the Rayleigh quotient at the computed solution x.
+    norm_lb <- blk$mean_quadratic + lambda
+    rayleigh <- sum(x * opx) / sum(x^2)
+    cond_lb <- if (is.finite(rayleigh) && rayleigh > 0) norm_lb / rayleigh else Inf
+    singular <- !is.finite(cond_lb) || cond_lb > 1e10
     diagnostics$solves[[length(diagnostics$solves) + 1L]] <<- list(
       arm = arm, rhs = if (all(rhs == 1)) "ones" else "target",
       iterations = if (is.null(it)) NA_integer_ else it,
-      residual_l2 = residual, residual_limit = limit, converged = ok)
-    if (!ok) fail(paste("Linear solve did not converge for", arm, "arm."))
+      residual_l2 = residual, residual_limit = limit, condition_lower_bound = cond_lb,
+      converged = ok)
+    if (ok && singular)
+      fail(singular_message(arm, paste("condition number at least", signif(cond_lb, 3))))
+    if (!ok) fail(paste0("Linear solve did not converge for ", arm, " arm. ",
+                         "Increase 'maxiter' or 'lambda', or use solver = \"bj\"."))
+    if (cond_lb > 1e6 && !(arm %in% iters_env$warned)) {
+      iters_env$warned <- c(iters_env$warned, arm)
+      warning("Kernel block for the ", arm, " arm is ill-conditioned (condition number at ",
+              "least ", signif(cond_lb, 3), "); the weights can be extreme. ",
+              "Consider a larger 'lambda'.", call. = FALSE)
+    }
     note_iters(res)
   }
+  singular_message <- function(arm, detail) paste0("Kernel block for the ", arm,
+    " arm is numerically singular (", detail, "); the balancing weights are not determined. ",
+    "Use a positive 'lambda'.")
+  # A factorization failure means the block is singular to working precision.
+  direct_solve <- function(K, rhs, arm) tryCatch(solve(K, rhs), error = function(e)
+    fail(singular_message(arm, paste("factorization failed:", conditionMessage(e)))))
+  # Each arm's kernel block (or factor rows) and its fixed summaries, computed once.
+  arm_block <- function(arm) {
+    if (is.null(iters_env$blocks[[arm]])) {
+      ix <- if (arm == "treated") which(trt == 1) else which(trt == 0)
+      if (solver %in% c("cg", "bj")) {
+        m <- Z[ix, , drop = FALSE]
+        row_bound <- max(as.numeric(abs(m) %*% Matrix::colSums(abs(m)))) / num.trees
+        mean_quadratic <- sum(Matrix::colSums(m)^2) / (num.trees * length(ix))
+      } else {
+        m <- kern[ix, ix, drop = FALSE]
+        row_bound <- max(Matrix::rowSums(abs(m)))
+        mean_quadratic <- sum(m) / length(ix)
+      }
+      iters_env$blocks[[arm]] <- list(m = m, row_bound = row_bound,
+                                      mean_quadratic = mean_quadratic)
+    }
+    iters_env$blocks[[arm]]
+  }
   iters_env <- new.env()
+  iters_env$blocks <- list()
   iters_env$max <- NA_integer_
+  iters_env$warned <- character()
   note_iters <- function(res) {
     it <- attr(res, "iters")
     if (!is.null(it)) iters_env$max <- max(iters_env$max, it, na.rm = TRUE)
@@ -276,17 +319,15 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
     if (estimand == "ATT") {
       w_t <- ones_t
     } else {
-      s1 <- solve_t(ones_t);   sb <- solve_t(b_t)
-      X11 <- n1^2 * sum(s1); YY1 <- n1^2 * sum(sb) - n1
-      w_t <- n1^2 * (sb - (YY1 / X11) * s1)
+      s1 <- solve_t(ones_t);   sb <- solve_t(n1^2 * b_t)
+      w_t <- sb - ((sum(sb) - n1) / sum(s1)) * s1
     }
 
     if (estimand == "ATC") {
       w_c <- ones_c
     } else {
-      s1 <- solve_c(ones_c);   sb <- solve_c(b_c)
-      X22 <- n0^2 * sum(s1); YY2 <- n0^2 * sum(sb) - n0
-      w_c <- n0^2 * (sb - (YY2 / X22) * s1)
+      s1 <- solve_c(ones_c);   sb <- solve_c(n0^2 * b_c)
+      w_c <- sb - ((sum(sb) - n0) / sum(s1)) * s1
     }
 
   } else {
@@ -318,10 +359,9 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
     } else {
       K_tt <- kern[idx_t, idx_t, drop = FALSE]
       if (lambda > 0) K_tt <- K_tt + lambda * Matrix::Diagonal(n1)
-      s1 <- audit_solve(solve(K_tt, ones_t), ones_t, "treated")
-      sb <- audit_solve(solve(K_tt, b_t), b_t, "treated")
-      X11 <- n1^2 * sum(s1); YY1 <- n1^2 * sum(sb) - n1
-      w_t <- n1^2 * (sb - (YY1 / X11) * s1)
+      s1 <- audit_solve(direct_solve(K_tt, ones_t, "treated"), ones_t, "treated")
+      sb <- audit_solve(direct_solve(K_tt, n1^2 * b_t, "treated"), n1^2 * b_t, "treated")
+      w_t <- sb - ((sum(sb) - n1) / sum(s1)) * s1
     }
 
     if (estimand == "ATC") {
@@ -329,10 +369,9 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
     } else {
       K_cc <- kern[idx_c, idx_c, drop = FALSE]
       if (lambda > 0) K_cc <- K_cc + lambda * Matrix::Diagonal(n0)
-      s1 <- audit_solve(solve(K_cc, ones_c), ones_c, "control")
-      sb <- audit_solve(solve(K_cc, b_c), b_c, "control")
-      X22 <- n0^2 * sum(s1); YY2 <- n0^2 * sum(sb) - n0
-      w_c <- n0^2 * (sb - (YY2 / X22) * s1)
+      s1 <- audit_solve(direct_solve(K_cc, ones_c, "control"), ones_c, "control")
+      sb <- audit_solve(direct_solve(K_cc, n0^2 * b_c, "control"), n0^2 * b_c, "control")
+      w_c <- sb - ((sum(sb) - n0) / sum(s1)) * s1
     }
   }
 
@@ -348,9 +387,9 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
       ba <- if (a == "treated") b_t else b_c
       feasible_w <- wa + (na - sum(wa)) / na
       if (solver %in% c("cg", "bj")) {
-        za <- Z[ix, , drop = FALSE]
+        za <- arm_block(a)$m
         grad <- as.numeric(za %*% Matrix::crossprod(za, feasible_w))/num.trees + lambda * feasible_w - na^2 * ba
-      } else grad <- as.numeric(kern[ix, ix, drop = FALSE] %*% feasible_w) + lambda * feasible_w - na^2 * ba
+      } else grad <- as.numeric(arm_block(a)$m %*% feasible_w) + lambda * feasible_w - na^2 * ba
       projected <- sqrt(sum((grad - mean(grad))^2))
       bound <- if (lambda > 0) projected / lambda + mass_error / sqrt(na) else NA_real_
       # For PSD kernels and positive ridge this bounds distance to the constrained
@@ -414,7 +453,6 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
     z <- precondition(r)
     p <- z
     rz <- sum(r * z)
-    rhs_norm <- sqrt(sum(rhs_scaled^2))
     iters <- 0L
 
     for (i in seq_len(maxiter)) {
@@ -426,7 +464,9 @@ kernel_balance <- function(trt, kern = NULL, Z = NULL, leaf_matrix = NULL,
       x <- x + alpha * p
       r <- r - alpha * Ap
       rnorm2 <- sum(r * r)
-      if (!is.finite(rnorm2) || sqrt(rnorm2) / rhs_norm < tol) break
+      # Absolute B-scaled criterion, as in cg_solve_cpp: a relative criterion lets the
+      # weight error grow with the size of the target right-hand side.
+      if (!is.finite(rnorm2) || sqrt(rnorm2) < tol) break
       z <- precondition(r)
       rz_new <- sum(r * z)
       if (!is.finite(rz_new) || rz_new == 0) break

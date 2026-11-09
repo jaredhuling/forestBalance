@@ -7,10 +7,12 @@
 multivariate random forests with kernel energy balancing. A joint forest
 model of covariates, treatment, and outcome defines a proximity kernel
 that characterizes the confounding structure and emphasizes similarity
-of observations in terms of confounding. Distributional balancing
-weights are then obtained via a closed-form kernel energy distance
-solution. By construction, these balancing weights aim to balance the
-joint distribution of confounders specifically.
+of observations in terms of confounding. The kernel is then used in
+kernel energy balancing, which minimizes the distributional distance
+between treatment and control groups. By using the joint forest kernel,
+this balancing approach emphasizes balance of variables that impact both
+treatment and outcome. By construction, these balancing weights aim to
+balance the joint distribution of confounders specifically.
 
 The method is described in:
 
@@ -36,13 +38,16 @@ dat <- simulate_data(n = 500, p = 10, ate = 0)
 # Estimate ATE with forest kernel energy balancing
 fit <- forest_balance(dat$X, dat$A, dat$Y)
 fit
-#> Forest Kernel Energy Balancing
+#> Forest Kernel Energy Balancing (cross-fitted)
 #> -------------------------------------------------- 
-#>   n = 500  (n_treated = 173, n_control = 327)
+#>   n = 500  (n_treated = 156, n_control = 344)
 #>   Trees: 1000
-#>   Solver: direct
-#>   ATE estimate: 0.0455
-#>   ESS: treated = 105/173 (61%)   control = 232/327 (71%)
+#>   Estimand: ATE
+#>   Cross-fitting: 2 folds
+#>   Solver: cg
+#>   ATE estimate: -0.0041
+#>   Fold ATEs: -0.2443, 0.2361
+#>   ESS: treated = 118/156 (76%)   control = 283/344 (82%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
 ```
@@ -82,7 +87,7 @@ dat <- simulate_data(n = 800, p = 10, ate = 0)
 naive_ate <- mean(dat$Y[dat$A == 1]) - mean(dat$Y[dat$A == 0])
 c("Naive ATE" = round(naive_ate, 4), "True ATE" = 0)
 #> Naive ATE  True ATE 
-#>    0.9812    0.0000
+#>    1.7054    0.0000
 ```
 
 ### Fitting the model
@@ -97,13 +102,16 @@ fit <- forest_balance(dat$X, dat$A, dat$Y, num.trees = 1000)
 
 ``` r
 fit
-#> Forest Kernel Energy Balancing
+#> Forest Kernel Energy Balancing (cross-fitted)
 #> -------------------------------------------------- 
-#>   n = 800  (n_treated = 275, n_control = 525)
+#>   n = 800  (n_treated = 284, n_control = 516)
 #>   Trees: 1000
+#>   Estimand: ATE
+#>   Cross-fitting: 2 folds
 #>   Solver: direct
-#>   ATE estimate: 0.0388
-#>   ESS: treated = 191/275 (70%)   control = 394/525 (75%)
+#>   ATE estimate: 0.0986
+#>   Fold ATEs: 0.1494, 0.0477
+#>   ESS: treated = 209/284 (73%)   control = 422/516 (82%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
 ```
@@ -115,40 +123,40 @@ weighted) with flagged imbalances:
 summary(fit)
 #> Forest Kernel Energy Balancing
 #> ============================================================ 
-#>   n = 800  (n_treated = 275, n_control = 525)
+#>   n = 800  (n_treated = 284, n_control = 516)
 #>   Trees: 1000
-#>   Kernel density: 29.0% nonzero
+#>   Solver: CG (kernel not materialized)
 #> 
-#>   ATE estimate: 0.0388
+#>   ATE estimate: 0.0986
 #> ============================================================ 
 #> 
 #> Covariate Balance (|SMD|)
 #> ------------------------------------------------------------ 
 #>   Covariate     Unweighted      Weighted
 #>   ----------  ------------  ------------
-#>   X1              0.1668 *        0.0220
-#>   X2              0.2956 *        0.0086
-#>   X3                0.0277        0.0148
-#>   X4              0.1102 *        0.0242
-#>   X5                0.0430        0.0210
-#>   X6                0.0189        0.0055
-#>   X7                0.0945        0.0258
-#>   X8                0.0733        0.0033
-#>   X9                0.0332        0.0284
-#>   X10               0.0734        0.0055
+#>   X1              0.2467 *        0.0081
+#>   X2                0.0052        0.0235
+#>   X3                0.0690        0.0188
+#>   X4                0.0096        0.0023
+#>   X5                0.0382        0.0250
+#>   X6                0.0633        0.0200
+#>   X7                0.0354        0.0408
+#>   X8                0.0040        0.0211
+#>   X9              0.1140 *        0.0162
+#>   X10             0.1740 *      0.1261 *
 #>   ----------  ------------  ------------
-#>   Max |SMD|         0.2956        0.0284
+#>   Max |SMD|         0.2467        0.1261
 #>   (* indicates |SMD| > 0.10)
 #> 
 #> Effective Sample Size
 #> ------------------------------------------------------------ 
-#>   Treated: 191 / 275  (70%)
-#>   Control: 394 / 525  (75%)
+#>   Treated: 209 / 284  (73%)
+#>   Control: 422 / 516  (82%)
 #> 
 #> Energy Distance
 #> ------------------------------------------------------------ 
-#>   Unweighted: 0.0486
-#>   Weighted:   0.0144
+#>   Unweighted: 0.0397
+#>   Weighted:   0.0173
 #> ============================================================
 ```
 
@@ -170,54 +178,54 @@ colnames(X.nl) <- c("X1^2", "X2^2", "X5^2", "X1*X2", "X1*X5",
 summary(fit, X.trans = X.nl)
 #> Forest Kernel Energy Balancing
 #> ============================================================ 
-#>   n = 800  (n_treated = 275, n_control = 525)
+#>   n = 800  (n_treated = 284, n_control = 516)
 #>   Trees: 1000
-#>   Kernel density: 29.0% nonzero
+#>   Solver: CG (kernel not materialized)
 #> 
-#>   ATE estimate: 0.0388
+#>   ATE estimate: 0.0986
 #> ============================================================ 
 #> 
 #> Covariate Balance (|SMD|)
 #> ------------------------------------------------------------ 
 #>   Covariate     Unweighted      Weighted
 #>   ----------  ------------  ------------
-#>   X1              0.1668 *        0.0220
-#>   X2              0.2956 *        0.0086
-#>   X3                0.0277        0.0148
-#>   X4              0.1102 *        0.0242
-#>   X5                0.0430        0.0210
-#>   X6                0.0189        0.0055
-#>   X7                0.0945        0.0258
-#>   X8                0.0733        0.0033
-#>   X9                0.0332        0.0284
-#>   X10               0.0734        0.0055
+#>   X1              0.2467 *        0.0081
+#>   X2                0.0052        0.0235
+#>   X3                0.0690        0.0188
+#>   X4                0.0096        0.0023
+#>   X5                0.0382        0.0250
+#>   X6                0.0633        0.0200
+#>   X7                0.0354        0.0408
+#>   X8                0.0040        0.0211
+#>   X9              0.1140 *        0.0162
+#>   X10             0.1740 *      0.1261 *
 #>   ----------  ------------  ------------
-#>   Max |SMD|         0.2956        0.0284
+#>   Max |SMD|         0.2467        0.1261
 #>   (* indicates |SMD| > 0.10)
 #> 
 #> Transformed Covariate Balance (|SMD|)
 #> ------------------------------------------------------------ 
 #>   Transform     Unweighted      Weighted
 #>   ----------  ------------  ------------
-#>   X1^2            0.2904 *        0.0259
-#>   X2^2              0.0941        0.0322
-#>   X5^2              0.0841        0.0694
-#>   X1*X2           0.1303 *        0.0144
-#>   X1*X5             0.0573        0.0582
-#>   Beta(X1)        0.6847 *        0.0347
-#>   Beta(X5)          0.0289        0.0138
+#>   X1^2            0.1769 *        0.0394
+#>   X2^2              0.0125        0.0079
+#>   X5^2              0.0453        0.0474
+#>   X1*X2             0.0397        0.0176
+#>   X1*X5             0.0407        0.0025
+#>   Beta(X1)        0.7025 *        0.0353
+#>   Beta(X5)        0.1256 *        0.0165
 #>   ----------  ------------  ------------
-#>   Max |SMD|         0.6847        0.0694
+#>   Max |SMD|         0.7025        0.0474
 #> 
 #> Effective Sample Size
 #> ------------------------------------------------------------ 
-#>   Treated: 191 / 275  (70%)
-#>   Control: 394 / 525  (75%)
+#>   Treated: 209 / 284  (73%)
+#>   Control: 422 / 516  (82%)
 #> 
 #> Energy Distance
 #> ------------------------------------------------------------ 
-#>   Unweighted: 0.0486
-#>   Weighted:   0.0144
+#>   Unweighted: 0.0397
+#>   Weighted:   0.0173
 #> ============================================================
 ```
 
@@ -235,7 +243,7 @@ bal_ipw    <- compute_balance(dat$X, dat$A, ipw)
 c("Forest balance" = round(bal_forest$max_smd, 4),
   "IPW"            = round(bal_ipw$max_smd, 4))
 #> Forest balance            IPW 
-#>         0.0284         0.2508
+#>         0.1261         0.2063
 ```
 
 ### Lower-level interface
@@ -258,7 +266,7 @@ c("observations" = nrow(leaf_mat), "trees" = ncol(leaf_mat))
 #>          800          500
 c("kernel % nonzero" = round(100 * length(K@x) / prod(dim(K)), 1))
 #> kernel % nonzero 
-#>             24.5
+#>             24.3
 
 # 3. Compute balancing weights
 bal <- kernel_balance(dat$A, K)
@@ -267,7 +275,7 @@ ate <- weighted.mean(dat$Y[dat$A == 1], bal$weights[dat$A == 1]) -
        weighted.mean(dat$Y[dat$A == 0], bal$weights[dat$A == 0])
 c("ATE estimate" = round(ate, 4))
 #> ATE estimate 
-#>       0.1455
+#>       0.3684
 ```
 
 ## Simulation study
@@ -290,8 +298,8 @@ for (r in seq_len(nreps)) {
 
 | Method |   Bias |     SD |   RMSE |
 |:-------|-------:|-------:|-------:|
-| Naive  | 1.2055 | 0.2983 | 1.2419 |
-| Forest | 0.0932 | 0.1428 | 0.1705 |
+| Naive  | 1.2944 | 0.2984 | 1.3284 |
+| Forest | 0.1086 | 0.1613 | 0.1945 |
 
 ![](man/figures/README-sim-plot-1.png)<!-- -->
 

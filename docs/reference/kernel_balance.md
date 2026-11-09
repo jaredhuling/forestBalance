@@ -14,7 +14,9 @@ kernel_balance(
   Z = NULL,
   leaf_matrix = NULL,
   num.trees = NULL,
+  estimand = c("ATE", "ATT", "ATC"),
   solver = c("auto", "direct", "cg", "bj"),
+  lambda = 0.1,
   tol = 1e-08,
   maxiter = 2000L
 )
@@ -55,12 +57,27 @@ kernel_balance(
 
   Number of trees \\B\\. Required when `Z` is provided.
 
+- estimand:
+
+  Target estimand: `"ATE"` (default), `"ATT"`, or `"ATC"`.
+
 - solver:
 
   Which linear solver to use. `"auto"` (default) selects the best
   available solver based on the inputs: `"cg"` when `Z` is available and
   \\n \> 5000\\, or `"direct"` otherwise. See Details for solver
   requirements.
+
+- lambda:
+
+  Nonnegative ridge penalty on the weights. The group-\\a\\ problem
+  solved is \\\tfrac12 \\ \sum\_{i \in S_a} w_i K(X_i,\cdot) - n_a P_n
+  \\^2 + \tfrac{\lambda}{2}\\w_a\\^2\\ subject to \\\sum\_{i \in S_a}
+  w_i = n_a\\, whose KKT system is \\(K\_{aa} + \lambda I) w_a = b_a +
+  \gamma_a 1\\. Default `0.1`. The ridge makes the weights unique when
+  the kernel block is singular, which happens when several units share
+  leaves in nearly every tree. With `lambda = 0` a numerically singular
+  block raises an error.
 
 - tol:
 
@@ -82,6 +99,14 @@ A list with the following elements:
 - solver:
 
   The solver that was used.
+
+- diagnostics:
+
+  Residuals and convergence checks for every linear solve, arm-total
+  errors, and projected KKT residuals. For positive ridge and a positive
+  semidefinite kernel, the reported weight error bound includes the
+  arm-total correction. Failed accuracy checks raise an error carrying
+  diagnostics.
 
 ## Details
 
@@ -147,7 +172,7 @@ bal_cg <- kernel_balance(A, Z = Z, num.trees = 500, solver = "cg")
 
 # Both solvers give the same weights
 max(abs(bal_direct$weights - bal_cg$weights))
-#> [1] 2.038228e-07
+#> [1] 8.771761e-12
 
 # Weighted ATE estimate
 w <- bal_cg$weights

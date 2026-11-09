@@ -16,14 +16,19 @@ forest_balance(
   Y,
   num.trees = 1000,
   min.node.size = NULL,
+  estimand = c("ATE", "ATT", "ATC"),
   cross.fitting = TRUE,
   num.folds = 2,
   augmented = FALSE,
   mu.hat = NULL,
   scale.outcomes = TRUE,
   solver = c("auto", "direct", "cg", "bj"),
+  lambda = 0.1,
+  kernel.response = c("joint", "treatment", "outcome"),
+  crossfit.balance = c("fold", "full"),
   tol = 1e-08,
   parallel = FALSE,
+  maxiter = 2000L,
   ...
 )
 ```
@@ -53,6 +58,10 @@ forest_balance(
   `max(20, min(floor(n/200) + p, floor(n/50)))`. This scales the leaf
   size with both the sample size and the number of covariates, which
   empirically yields low bias. See Details.
+
+- estimand:
+
+  Target estimand: `"ATE"` (default), `"ATT"`, or `"ATC"`.
 
 - cross.fitting:
 
@@ -99,6 +108,26 @@ forest_balance(
   [`kernel_balance`](https://jaredhuling.github.io/forestBalance/reference/kernel_balance.md)
   for details.
 
+- lambda:
+
+  Nonnegative ridge penalty on the balancing weights; see
+  [`kernel_balance`](https://jaredhuling.github.io/forestBalance/reference/kernel_balance.md).
+  Default `0.1`.
+
+- kernel.response:
+
+  Which responses the kernel-defining forest is fit to: `"joint"`
+  (default; treatment and outcome, the proposed method), `"treatment"`
+  (treatment only), or `"outcome"` (outcome only). The latter two exist
+  for ablation studies.
+
+- crossfit.balance:
+
+  Under cross-fitting, whether the balancing problem for fold \\v\\ is
+  solved within the fold (`"fold"`, default) or on the full sample with
+  the kernel learned on the other folds, keeping only fold \\v\\'s
+  weights (`"full"`).
+
 - tol:
 
   Convergence tolerance for the CG solver. Default is `5e-11`.
@@ -112,6 +141,10 @@ forest_balance(
   value specifies the exact number of cores. Only used when
   `cross.fitting = TRUE`. Note: parallel processing is not supported on
   Windows.
+
+- maxiter:
+
+  Maximum iterations for each iterative balancing solve. Default 2000.
 
 - ...:
 
@@ -152,6 +185,15 @@ elements:
 
   The trained forest object. When cross-fitting is used, this is the
   last fold's forest.
+
+- forests:
+
+  All trained forests, one per fold.
+
+- fold_diagnostics:
+
+  Per-fold index maps, complete balancing weights, and solver residual
+  checks. Failed folds are errors.
 
 - X, A, Y:
 
@@ -261,11 +303,12 @@ result
 #> -------------------------------------------------- 
 #>   n = 500  (n_treated = 237, n_control = 263)
 #>   Trees: 1000
+#>   Estimand: ATE
 #>   Cross-fitting: 2 folds
 #>   Solver: cg
-#>   ATE estimate: 0.0576
-#>   Fold ATEs: 0.0499, 0.0652
-#>   ESS: treated = 172/237 (73%)   control = 198/263 (75%)
+#>   ATE estimate: 0.0819
+#>   Fold ATEs: 0.0793, 0.0846
+#>   ESS: treated = 193/237 (82%)   control = 219/263 (83%)
 #> -------------------------------------------------- 
 #> Use summary() for covariate balance details.
 

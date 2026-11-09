@@ -13,7 +13,7 @@ from the kernel energy distance objective."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">forestBalance</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -60,7 +60,9 @@ from the kernel energy distance objective.</p>
 <span>  Z <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  leaf_matrix <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  num.trees <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  estimand <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ATE"</span>, <span class="st">"ATT"</span>, <span class="st">"ATC"</span><span class="op">)</span>,</span>
 <span>  solver <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"auto"</span>, <span class="st">"direct"</span>, <span class="st">"cg"</span>, <span class="st">"bj"</span><span class="op">)</span>,</span>
+<span>  lambda <span class="op">=</span> <span class="fl">0.1</span>,</span>
 <span>  tol <span class="op">=</span> <span class="fl">1e-08</span>,</span>
 <span>  maxiter <span class="op">=</span> <span class="fl">2000L</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -104,11 +106,25 @@ back to <code>"cg"</code> with a warning.</p></dd>
 provided.</p></dd>
 
 
+<dt id="arg-estimand">estimand<a class="anchor" aria-label="anchor" href="#arg-estimand"></a></dt>
+<dd><p>Target estimand: <code>"ATE"</code> (default), <code>"ATT"</code>, or <code>"ATC"</code>.</p></dd>
+
+
 <dt id="arg-solver">solver<a class="anchor" aria-label="anchor" href="#arg-solver"></a></dt>
 <dd><p>Which linear solver to use. <code>"auto"</code> (default) selects
 the best available solver based on the inputs: <code>"cg"</code> when <code>Z</code>
 is available and \(n &gt; 5000\), or <code>"direct"</code> otherwise. See
 Details for solver requirements.</p></dd>
+
+
+<dt id="arg-lambda">lambda<a class="anchor" aria-label="anchor" href="#arg-lambda"></a></dt>
+<dd><p>Nonnegative ridge penalty on the weights. The group-\(a\) problem
+solved is \(\tfrac12 \| \sum_{i \in S_a} w_i K(X_i,\cdot) - n_a P_n \|^2 + \tfrac{\lambda}{2}\|w_a\|^2\)
+subject to \(\sum_{i \in S_a} w_i = n_a\), whose KKT system is
+\((K_{aa} + \lambda I) w_a = b_a + \gamma_a 1\). Default <code>0.1</code>. The ridge makes
+the weights unique when the kernel block is singular, which happens when several units
+share leaves in nearly every tree. With <code>lambda = 0</code> a numerically singular block
+raises an error.</p></dd>
 
 
 <dt id="arg-tol">tol<a class="anchor" aria-label="anchor" href="#arg-tol"></a></dt>
@@ -129,6 +145,9 @@ weights. Treated weights sum to \(n_1\) and control weights sum to
 
 <dt>solver</dt>
 <dd><p>The solver that was used.</p></dd>
+
+<dt>diagnostics</dt>
+<dd><p>Residuals and convergence checks for every linear solve, arm-total errors, and projected KKT residuals. For positive ridge and a positive semidefinite kernel, the reported weight error bound includes the arm-total correction. Failed accuracy checks raise an error carrying diagnostics.</p></dd>
 
 
 </dl></div>
@@ -184,7 +203,7 @@ effect estimation for high dimensional data.
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Both solvers give the same weights</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">bal_direct</span><span class="op">$</span><span class="va">weights</span> <span class="op">-</span> <span class="va">bal_cg</span><span class="op">$</span><span class="va">weights</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 2.038228e-07</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 8.771761e-12</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Weighted ATE estimate</span></span></span>
 <span class="r-in"><span><span class="va">w</span> <span class="op">&lt;-</span> <span class="va">bal_cg</span><span class="op">$</span><span class="va">weights</span></span></span>

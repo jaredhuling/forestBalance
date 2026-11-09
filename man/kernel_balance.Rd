@@ -12,7 +12,7 @@ kernel_balance(
   num.trees = NULL,
   estimand = c("ATE", "ATT", "ATC"),
   solver = c("auto", "direct", "cg", "bj"),
-  lambda = 0,
+  lambda = 0.1,
   tol = 1e-08,
   maxiter = 2000L
 )
@@ -52,7 +52,10 @@ Details for solver requirements.}
 \item{lambda}{Nonnegative ridge penalty on the weights. The group-\eqn{a} problem
 solved is \eqn{\tfrac12 \| \sum_{i \in S_a} w_i K(X_i,\cdot) - n_a P_n \|^2 + \tfrac{\lambda}{2}\|w_a\|^2}
 subject to \eqn{\sum_{i \in S_a} w_i = n_a}, whose KKT system is
-\eqn{(K_{aa} + \lambda I) w_a = b_a + \gamma_a 1}. Default \code{0} (no ridge).}
+\eqn{(K_{aa} + \lambda I) w_a = b_a + \gamma_a 1}. Default \code{0.1}. The ridge makes
+the weights unique when the kernel block is singular, which happens when several units
+share leaves in nearly every tree. With \code{lambda = 0} a numerically singular block
+raises an error.}
 
 \item{tol}{Convergence tolerance for iterative solvers. Default is
 \code{1e-8}.}

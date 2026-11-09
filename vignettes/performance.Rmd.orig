@@ -122,23 +122,24 @@ applies to the control block with $Z_c$.
 
 Here, the memory use is $O(nB)$ for $Z$ alone, versus $O(n^2)$ for the kernel.
 Each CG iteration costs $O(n_g B)$ (where $n_g$ is the group size).
-Convergence typically requires 100--200 iterations, independent of $n$, so
+Convergence requires a few hundred iterations in the examples below, so
 the total cost is $O(n_g B \cdot T_{\text{iter}})$.  Only four solves are
 needed (two per block), since the third right-hand side is a linear
 combination of the first two.
 
 **Computational Cost:** $O\bigl((n_1 + n_0) \cdot B \cdot T_{\text{iter}}\bigr)$
-where $T_{\text{iter}} \approx 100\text{--}200$.  This scales linearly in both
-$n$ and $B$.
+where $T_{\text{iter}}$ is the number of iterations.  For a fixed number of
+iterations this scales linearly in both $n$ and $B$.
 
-### Block Jacobi preconditioned CG (default for large $n$)
+### Block Jacobi preconditioned CG
 
 Plain CG can require many iterations at large $n$.  The **Block Jacobi**
 solver uses the first tree's leaf partition to build a block-diagonal
 preconditioner.  Each leaf block is a small dense system
 (~`min.node.size` $\times$ `min.node.size`) that is cheap to factor.
-Preconditioned CG then converges in far fewer iterations---typically
-5--10$\times$ fewer than plain CG---giving a large overall speedup.
+Preconditioned CG then needs fewer iterations than plain CG (about 30\%
+fewer at $n = 10{,}000$ below), but each iteration also applies the
+preconditioner, so it is not always faster overall.
 
 Note: only 2 linear solves per treatment-group block are needed (not 3),
 because the third right-hand side is a linear combination of the first two.

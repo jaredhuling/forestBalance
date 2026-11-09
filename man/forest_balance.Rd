@@ -17,7 +17,7 @@ forest_balance(
   mu.hat = NULL,
   scale.outcomes = TRUE,
   solver = c("auto", "direct", "cg", "bj"),
-  lambda = 0,
+  lambda = 0.1,
   kernel.response = c("joint", "treatment", "outcome"),
   crossfit.balance = c("fold", "full"),
   tol = 1e-08,
@@ -77,7 +77,7 @@ and \code{"cg"} for large fold sizes. See \code{\link{kernel_balance}} for
 details.}
 
 \item{lambda}{Nonnegative ridge penalty on the balancing weights; see
-\code{\link{kernel_balance}}. Default \code{0}.}
+\code{\link{kernel_balance}}. Default \code{0.1}.}
 
 \item{kernel.response}{Which responses the kernel-defining forest is fit to:
 \code{"joint"} (default; treatment and outcome, the proposed method),

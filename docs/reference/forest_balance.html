@@ -17,7 +17,7 @@ on the same data used for treatment effect estimation."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">forestBalance</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -66,14 +66,19 @@ on the same data used for treatment effect estimation.</p>
 <span>  <span class="va">Y</span>,</span>
 <span>  num.trees <span class="op">=</span> <span class="fl">1000</span>,</span>
 <span>  min.node.size <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  estimand <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ATE"</span>, <span class="st">"ATT"</span>, <span class="st">"ATC"</span><span class="op">)</span>,</span>
 <span>  cross.fitting <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  num.folds <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>  augmented <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  mu.hat <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  scale.outcomes <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  solver <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"auto"</span>, <span class="st">"direct"</span>, <span class="st">"cg"</span>, <span class="st">"bj"</span><span class="op">)</span>,</span>
+<span>  lambda <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  kernel.response <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"joint"</span>, <span class="st">"treatment"</span>, <span class="st">"outcome"</span><span class="op">)</span>,</span>
+<span>  crossfit.balance <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"fold"</span>, <span class="st">"full"</span><span class="op">)</span>,</span>
 <span>  tol <span class="op">=</span> <span class="fl">1e-08</span>,</span>
 <span>  parallel <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  maxiter <span class="op">=</span> <span class="fl">2000L</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -104,6 +109,10 @@ on the same data used for treatment effect estimation.</p>
 <code>max(20, min(floor(n/200) + p, floor(n/50)))</code>. This scales the leaf
 size with both the sample size and the number of covariates, which
 empirically yields low bias. See Details.</p></dd>
+
+
+<dt id="arg-estimand">estimand<a class="anchor" aria-label="anchor" href="#arg-estimand"></a></dt>
+<dd><p>Target estimand: <code>"ATE"</code> (default), <code>"ATT"</code>, or <code>"ATC"</code>.</p></dd>
 
 
 <dt id="arg-cross-fitting">cross.fitting<a class="anchor" aria-label="anchor" href="#arg-cross-fitting"></a></dt>
@@ -151,6 +160,24 @@ and <code>"cg"</code> for large fold sizes. See <code><a href="kernel_balance.ht
 details.</p></dd>
 
 
+<dt id="arg-lambda">lambda<a class="anchor" aria-label="anchor" href="#arg-lambda"></a></dt>
+<dd><p>Nonnegative ridge penalty on the balancing weights; see
+<code><a href="kernel_balance.html">kernel_balance</a></code>. Default <code>0.1</code>.</p></dd>
+
+
+<dt id="arg-kernel-response">kernel.response<a class="anchor" aria-label="anchor" href="#arg-kernel-response"></a></dt>
+<dd><p>Which responses the kernel-defining forest is fit to:
+<code>"joint"</code> (default; treatment and outcome, the proposed method),
+<code>"treatment"</code> (treatment only), or <code>"outcome"</code> (outcome only). The
+latter two exist for ablation studies.</p></dd>
+
+
+<dt id="arg-crossfit-balance">crossfit.balance<a class="anchor" aria-label="anchor" href="#arg-crossfit-balance"></a></dt>
+<dd><p>Under cross-fitting, whether the balancing problem for fold
+\(v\) is solved within the fold (<code>"fold"</code>, default) or on the full sample with
+the kernel learned on the other folds, keeping only fold \(v\)'s weights (<code>"full"</code>).</p></dd>
+
+
 <dt id="arg-tol">tol<a class="anchor" aria-label="anchor" href="#arg-tol"></a></dt>
 <dd><p>Convergence tolerance for the CG solver. Default is <code>5e-11</code>.</p></dd>
 
@@ -162,6 +189,10 @@ using all available cores via <code><a href="https://rdrr.io/r/parallel/mclapply
 value specifies the exact number of cores. Only used when
 <code>cross.fitting = TRUE</code>. Note: parallel processing is not supported on
 Windows.</p></dd>
+
+
+<dt id="arg-maxiter">maxiter<a class="anchor" aria-label="anchor" href="#arg-maxiter"></a></dt>
+<dd><p>Maximum iterations for each iterative balancing solve. Default 2000.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -195,6 +226,12 @@ or <code>NULL</code> when cross-fitting or the CG solver is used.</p></dd>
 <dt>forest</dt>
 <dd><p>The trained forest object. When cross-fitting is used, this
 is the last fold's forest.</p></dd>
+
+<dt>forests</dt>
+<dd><p>All trained forests, one per fold.</p></dd>
+
+<dt>fold_diagnostics</dt>
+<dd><p>Per-fold index maps, complete balancing weights, and solver residual checks. Failed folds are errors.</p></dd>
 
 <dt>X, A, Y</dt>
 <dd><p>The input data.</p></dd>
@@ -285,11 +322,12 @@ effect estimation for high dimensional data.
 <span class="r-out co"><span class="r-pr">#&gt;</span> -------------------------------------------------- </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   n = 500  (n_treated = 237, n_control = 263)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Trees: 1000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Estimand: ATE</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Cross-fitting: 2 folds</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Solver: cg</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ATE estimate: 0.0576</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Fold ATEs: 0.0499, 0.0652</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ESS: treated = 172/237 (73%)   control = 198/263 (75%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ATE estimate: 0.0819</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Fold ATEs: 0.0793, 0.0846</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ESS: treated = 193/237 (82%)   control = 219/263 (83%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> -------------------------------------------------- </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Use summary() for covariate balance details.</span>
 <span class="r-in"><span></span></span>

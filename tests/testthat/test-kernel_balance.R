@@ -64,9 +64,11 @@ test_that("lambda = 0 reproduces the unpenalized solution and lambda > 0 keeps c
   Z <- leaf_node_kernel_Z(lm)
   n1 <- sum(dat$A == 1); n0 <- sum(dat$A == 0)
 
-  w0 <- kernel_balance(dat$A, kern = K, solver = "direct")$weights
-  w0b <- kernel_balance(dat$A, kern = K, solver = "direct", lambda = 0)$weights
-  expect_equal(w0, w0b)
+  w_default <- kernel_balance(dat$A, kern = K, solver = "direct")$weights
+  w_ridge <- kernel_balance(dat$A, kern = K, solver = "direct", lambda = 0.1)$weights
+  expect_equal(w_default, w_ridge)
+  w0 <- kernel_balance(dat$A, kern = K, solver = "direct", lambda = 0)$weights
+  expect_equal(sum(w0[dat$A == 1]), n1, tolerance = 1e-6)
 
   for (lam in c(0.01, 1)) {
     bd <- kernel_balance(dat$A, kern = K, solver = "direct", lambda = lam)
@@ -88,4 +90,36 @@ test_that("lambda = 0 reproduces the unpenalized solution and lambda > 0 keeps c
     expect_lt(diff(range(resid)), 1e-6 * max(1, abs(mean(resid))))
   }
   expect_error(kernel_balance(dat$A, kern = K, lambda = -1), "nonnegative")
+})
+
+test_that("a singular kernel block is rejected at lambda = 0 and resolved by a ridge", {
+  set.seed(11)
+  dat <- simulate_data(n = 300, p = 5)
+  # Duplicated units share every leaf, so their kernel rows coincide.
+  X <- rbind(dat$X, dat$X[1:40, ]); A <- c(dat$A, dat$A[1:40])
+  Y <- scale(cbind(A, c(dat$Y, dat$Y[1:40])))
+  forest <- grf::multi_regression_forest(X, Y, num.trees = 50, min.node.size = 10)
+  K <- leaf_node_kernel(get_leaf_node_matrix(forest, X))
+  # Matrix warns that its Cholesky attempt failed before the LU fallback errors.
+  expect_error(suppressWarnings(kernel_balance(A, kern = K, solver = "direct", lambda = 0)),
+               "numerically singular")
+  w <- kernel_balance(A, kern = K, solver = "direct", lambda = 0.1)$weights
+  expect_true(all(is.finite(w)))
+  expect_equal(sum(w[A == 1]), sum(A), tolerance = 1e-6)
+})
+
+test_that("a small ridge passes the final accuracy check with the iterative solver", {
+  set.seed(5)
+  dat <- simulate_data(n = 3000, p = 5)
+  forest <- grf::multi_regression_forest(dat$X, scale(cbind(dat$A, dat$Y)),
+                                          num.trees = 50, min.node.size = 20)
+  lm <- get_leaf_node_matrix(forest, dat$X)
+  Z <- leaf_node_kernel_Z(lm)
+  for (lam in c(1e-4, 1e-2, 0.1)) for (s in c("cg", "bj")) {
+    fit <- kernel_balance(dat$A, Z = Z, leaf_matrix = lm, num.trees = 50, solver = s,
+                          lambda = lam)
+    expect_true(all(is.finite(fit$weights)))
+    for (a in fit$diagnostics$arms)
+      expect_lte(a$weight_error_bound, a$weight_error_limit)
+  }
 })

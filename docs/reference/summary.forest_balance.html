@@ -11,7 +11,7 @@ kernel sparsity information."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">forestBalance</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -144,36 +144,36 @@ printing a detailed balance summary to the console.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Trees: 1000</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Solver: CG (kernel not materialized)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ATE estimate: 0.0025</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ATE estimate: 0.0067</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ============================================================ </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Covariate Balance (|SMD|)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ------------------------------------------------------------ </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Covariate     Unweighted      Weighted</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ----------  ------------  ------------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X1              0.4659 *        0.0155</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X2                0.0757        0.0142</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X3                0.0844        0.0083</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X4              0.1315 *        0.0309</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X5                0.0121        0.0325</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X6              0.1600 *        0.0590</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X1              0.4659 *        0.0205</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X2                0.0757        0.0215</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X3                0.0844        0.0052</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X4              0.1315 *        0.0423</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X5                0.0121        0.0399</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X6              0.1600 *        0.0737</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   X7              0.1450 *        0.0631</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X8                0.0711        0.0231</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X9                0.0233        0.0442</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X10               0.0582        0.0017</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X8                0.0711        0.0379</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X9                0.0233        0.0450</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X10               0.0582        0.0018</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ----------  ------------  ------------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Max |SMD|         0.4659        0.0631</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Max |SMD|         0.4659        0.0737</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   (* indicates |SMD| &gt; 0.10)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Effective Sample Size</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ------------------------------------------------------------ </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Treated: 201 / 266  (75%)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Control: 176 / 234  (75%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Treated: 225 / 266  (85%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Control: 192 / 234  (82%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Energy Distance</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ------------------------------------------------------------ </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Unweighted: 0.0833</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Weighted:   0.0220</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Weighted:   0.0216</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ============================================================ </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># With nonlinear balance assessment</span></span></span>
@@ -186,45 +186,45 @@ printing a detailed balance summary to the console.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Trees: 1000</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Solver: CG (kernel not materialized)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ATE estimate: 0.0025</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ATE estimate: 0.0067</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ============================================================ </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Covariate Balance (|SMD|)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ------------------------------------------------------------ </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Covariate     Unweighted      Weighted</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ----------  ------------  ------------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X1              0.4659 *        0.0155</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X2                0.0757        0.0142</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X3                0.0844        0.0083</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X4              0.1315 *        0.0309</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X5                0.0121        0.0325</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X6              0.1600 *        0.0590</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X1              0.4659 *        0.0205</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X2                0.0757        0.0215</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X3                0.0844        0.0052</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X4              0.1315 *        0.0423</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X5                0.0121        0.0399</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X6              0.1600 *        0.0737</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   X7              0.1450 *        0.0631</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X8                0.0711        0.0231</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X9                0.0233        0.0442</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X10               0.0582        0.0017</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X8                0.0711        0.0379</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X9                0.0233        0.0450</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X10               0.0582        0.0018</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ----------  ------------  ------------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Max |SMD|         0.4659        0.0631</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Max |SMD|         0.4659        0.0737</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   (* indicates |SMD| &gt; 0.10)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Transformed Covariate Balance (|SMD|)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ------------------------------------------------------------ </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Transform     Unweighted      Weighted</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ----------  ------------  ------------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X1^2              0.0953        0.0186</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   X1*X2             0.0305        0.0579</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X1^2              0.0953        0.0294</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   X1*X2             0.0305        0.0598</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ----------  ------------  ------------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Max |SMD|         0.0953        0.0579</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Max |SMD|         0.0953        0.0598</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Effective Sample Size</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ------------------------------------------------------------ </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Treated: 201 / 266  (75%)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Control: 176 / 234  (75%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Treated: 225 / 266  (85%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Control: 192 / 234  (82%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Energy Distance</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ------------------------------------------------------------ </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Unweighted: 0.0833</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Weighted:   0.0220</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Weighted:   0.0216</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ============================================================ </span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>

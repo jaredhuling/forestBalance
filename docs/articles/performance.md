@@ -114,25 +114,25 @@ same applies to the control block with $`Z_c`$.
 
 Here, the memory use is $`O(nB)`$ for $`Z`$ alone, versus $`O(n^2)`$ for
 the kernel. Each CG iteration costs $`O(n_g B)`$ (where $`n_g`$ is the
-group size). Convergence typically requires 100–200 iterations,
-independent of $`n`$, so the total cost is
-$`O(n_g B \cdot T_{\text{iter}})`$. Only four solves are needed (two per
-block), since the third right-hand side is a linear combination of the
-first two.
+group size). Convergence requires a few hundred iterations in the
+examples below, so the total cost is $`O(n_g B \cdot T_{\text{iter}})`$.
+Only four solves are needed (two per block), since the third right-hand
+side is a linear combination of the first two.
 
 **Computational Cost:**
 $`O\bigl((n_1 + n_0) \cdot B \cdot T_{\text{iter}}\bigr)`$ where
-$`T_{\text{iter}} \approx 100\text{--}200`$. This scales linearly in
-both $`n`$ and $`B`$.
+$`T_{\text{iter}}`$ is the number of iterations. For a fixed number of
+iterations this scales linearly in both $`n`$ and $`B`$.
 
-### Block Jacobi preconditioned CG (default for large $`n`$)
+### Block Jacobi preconditioned CG
 
 Plain CG can require many iterations at large $`n`$. The **Block
 Jacobi** solver uses the first tree’s leaf partition to build a
 block-diagonal preconditioner. Each leaf block is a small dense system
 (~`min.node.size` $`\times`$`min.node.size`) that is cheap to factor.
-Preconditioned CG then converges in far fewer iterations—typically
-5–10$`\times`$ fewer than plain CG—giving a large overall speedup.
+Preconditioned CG then needs fewer iterations than plain CG (about 30%
+fewer at $`n = 10{,}000`$ below), but each iteration also applies the
+preconditioner, so it is not always faster overall.
 
 Note: only 2 linear solves per treatment-group block are needed (not 3),
 because the third right-hand side is a linear combination of the first
@@ -179,11 +179,11 @@ solver_bench <- do.call(rbind, lapply(c(10000, 25000), function(nn) {
 
 |     n | Solver | Time (s) |      ATE |
 |------:|:-------|---------:|---------:|
-| 10000 | bj     |     5.54 | 0.015260 |
-| 10000 | cg     |     4.26 | 0.015261 |
-| 10000 | direct |    17.39 | 0.015260 |
-| 25000 | bj     |    30.47 | 0.006337 |
-| 25000 | cg     |    40.63 | 0.006344 |
+| 10000 | bj     |     8.97 | 0.016298 |
+| 10000 | cg     |     6.39 | 0.016298 |
+| 10000 | direct |    23.06 | 0.016298 |
+| 25000 | bj     |    45.65 | 0.006126 |
+| 25000 | cg     |    32.81 | 0.006126 |
 
 Solver comparison on the same kernel (B = 1,000). ATE agreement confirms
 solvers find the same solution.
@@ -222,13 +222,13 @@ bench <- do.call(rbind, lapply(n_vals, function(nn) {
 
 |     n | Trees | Time (s) | Solver |
 |------:|------:|---------:|:-------|
-|   500 |  1000 |     0.15 | cg     |
-|  1000 |  1000 |     0.18 | direct |
-|  2500 |  1000 |     0.62 | direct |
-|  5000 |  1000 |     2.20 | direct |
-| 10000 |  1000 |     9.51 | direct |
-| 25000 |  1000 |    38.16 | cg     |
-| 50000 |  1000 |   115.98 | cg     |
+|   500 |  1000 |     0.16 | cg     |
+|  1000 |  1000 |     0.29 | direct |
+|  2500 |  1000 |     1.03 | direct |
+|  5000 |  1000 |     4.26 | direct |
+| 10000 |  1000 |    16.18 | direct |
+| 25000 |  1000 |    27.79 | cg     |
+| 50000 |  1000 |    88.21 | cg     |
 
 Full pipeline time (auto solver).
 
@@ -260,18 +260,18 @@ tree_bench <- do.call(rbind, lapply(n_test, function(nn) {
 
 |     n | Trees | Time (s) |
 |------:|------:|---------:|
-|  1000 |   200 |     0.05 |
-|  1000 |   500 |     0.10 |
-|  1000 |  1000 |     0.17 |
-|  1000 |  2000 |     0.34 |
-|  5000 |   200 |     0.93 |
-|  5000 |   500 |     1.30 |
-|  5000 |  1000 |     2.09 |
-|  5000 |  2000 |     3.97 |
-| 25000 |   200 |    10.00 |
-| 25000 |   500 |    23.66 |
-| 25000 |  1000 |    37.66 |
-| 25000 |  2000 |    66.03 |
+|  1000 |   200 |     0.08 |
+|  1000 |   500 |     0.15 |
+|  1000 |  1000 |     0.25 |
+|  1000 |  2000 |     0.57 |
+|  5000 |   200 |     1.19 |
+|  5000 |   500 |     2.03 |
+|  5000 |  1000 |     3.97 |
+|  5000 |  2000 |     8.06 |
+| 25000 |   200 |     5.33 |
+| 25000 |   500 |    13.80 |
+| 25000 |  1000 |    28.14 |
+| 25000 |  2000 |    55.97 |
 
 Pipeline time across tree counts.
 
@@ -327,11 +327,11 @@ breakdown <- do.call(rbind, lapply(
 
 | n | Trees | mns | Forest fit (s) | Leaf extract (s) | Z build (s) | Balance (s) | Total (s) |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 1000 | 500 | 20 | 0.03 | 0.02 | 0.004 | 0.10 | 0.15 |
-| 5000 | 500 | 35 | 0.17 | 0.11 | 0.012 | 0.65 | 0.94 |
-| 5000 | 2000 | 35 | 0.66 | 0.42 | 0.102 | 2.33 | 3.52 |
-| 25000 | 500 | 135 | 0.94 | 0.53 | 0.069 | 26.14 | 27.68 |
-| 25000 | 1000 | 135 | 1.87 | 1.06 | 0.181 | 41.14 | 44.26 |
+| 1000 | 500 | 20 | 0.05 | 0.02 | 0.007 | 0.11 | 0.19 |
+| 5000 | 500 | 35 | 0.27 | 0.13 | 0.027 | 1.04 | 1.47 |
+| 5000 | 2000 | 35 | 1.00 | 0.50 | 0.098 | 4.47 | 6.07 |
+| 25000 | 500 | 135 | 1.40 | 0.62 | 0.120 | 16.04 | 18.19 |
+| 25000 | 1000 | 135 | 2.76 | 1.27 | 0.243 | 32.40 | 36.68 |
 
 Wall-clock time for each pipeline stage across configurations (CG
 solver, single fold).

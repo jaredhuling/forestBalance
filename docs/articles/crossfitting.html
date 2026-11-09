@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">forestBalance</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -121,15 +121,15 @@ covariates:</p>
 <tbody>
 <tr class="odd">
 <td align="left">No CF (mns=10)</td>
-<td align="right">0.1912</td>
-<td align="right">0.0288</td>
-<td align="right">0.1934</td>
+<td align="right">0.1999</td>
+<td align="right">0.0255</td>
+<td align="right">0.2015</td>
 </tr>
 <tr class="even">
 <td align="left">CF (default)</td>
-<td align="right">0.0021</td>
-<td align="right">0.0314</td>
-<td align="right">0.0315</td>
+<td align="right">0.0149</td>
+<td align="right">0.0248</td>
+<td align="right">0.0289</td>
 </tr>
 <tr class="odd">
 <td align="left">Oracle IPW</td>
@@ -264,44 +264,44 @@ the adaptive default (mns = 75).</caption>
 <tbody>
 <tr class="odd">
 <td align="right">5</td>
-<td align="right">0.1716</td>
-<td align="right">0.0134</td>
-<td align="right">0.1721</td>
+<td align="right">0.1865</td>
+<td align="right">0.0111</td>
+<td align="right">0.1868</td>
 <td align="left"></td>
 </tr>
 <tr class="even">
 <td align="right">10</td>
-<td align="right">0.1017</td>
-<td align="right">0.0015</td>
-<td align="right">0.1017</td>
+<td align="right">0.1141</td>
+<td align="right">0.0051</td>
+<td align="right">0.1143</td>
 <td align="left"></td>
 </tr>
 <tr class="odd">
 <td align="right">20</td>
-<td align="right">0.0153</td>
-<td align="right">0.0447</td>
-<td align="right">0.0472</td>
+<td align="right">0.0226</td>
+<td align="right">0.0463</td>
+<td align="right">0.0515</td>
 <td align="left"></td>
 </tr>
 <tr class="even">
 <td align="right">50</td>
-<td align="right">0.0481</td>
-<td align="right">0.0063</td>
-<td align="right">0.0485</td>
+<td align="right">0.0511</td>
+<td align="right">0.0026</td>
+<td align="right">0.0511</td>
 <td align="left"></td>
 </tr>
 <tr class="odd">
 <td align="right">75</td>
-<td align="right">-0.0099</td>
-<td align="right">0.0351</td>
-<td align="right">0.0364</td>
+<td align="right">-0.0020</td>
+<td align="right">0.0409</td>
+<td align="right">0.0409</td>
 <td align="left">&lt;–</td>
 </tr>
 <tr class="even">
 <td align="right">100</td>
-<td align="right">0.0332</td>
-<td align="right">0.0007</td>
-<td align="right">0.0332</td>
+<td align="right">0.0246</td>
+<td align="right">0.0088</td>
+<td align="right">0.0261</td>
 <td align="left"></td>
 </tr>
 </tbody>
@@ -321,11 +321,12 @@ The adaptive default balances bias reduction against variance.</p>
 <span><span class="co">#&gt; -------------------------------------------------- </span></span>
 <span><span class="co">#&gt;   n = 2,000  (n_treated = 745, n_control = 1255)</span></span>
 <span><span class="co">#&gt;   Trees: 1000</span></span>
+<span><span class="co">#&gt;   Estimand: ATE</span></span>
 <span><span class="co">#&gt;   Cross-fitting: 2 folds</span></span>
 <span><span class="co">#&gt;   Solver: direct</span></span>
-<span><span class="co">#&gt;   ATE estimate: -0.0315</span></span>
-<span><span class="co">#&gt;   Fold ATEs: -0.0808, 0.0177</span></span>
-<span><span class="co">#&gt;   ESS: treated = 529/745 (71%)   control = 878/1255 (70%)</span></span>
+<span><span class="co">#&gt;   ATE estimate: -0.0203</span></span>
+<span><span class="co">#&gt;   Fold ATEs: -0.0585, 0.0179</span></span>
+<span><span class="co">#&gt;   ESS: treated = 559/745 (75%)   control = 933/1255 (74%)</span></span>
 <span><span class="co">#&gt; -------------------------------------------------- </span></span>
 <span><span class="co">#&gt; Use summary() for covariate balance details.</span></span></code></pre></div>
 <p>To disable cross-fitting (e.g., for speed or to inspect the
@@ -337,9 +338,10 @@ kernel):</p>
 <span><span class="co">#&gt; -------------------------------------------------- </span></span>
 <span><span class="co">#&gt;   n = 2,000  (n_treated = 745, n_control = 1255)</span></span>
 <span><span class="co">#&gt;   Trees: 1000</span></span>
+<span><span class="co">#&gt;   Estimand: ATE</span></span>
 <span><span class="co">#&gt;   Solver: direct</span></span>
-<span><span class="co">#&gt;   ATE estimate: -0.0215</span></span>
-<span><span class="co">#&gt;   ESS: treated = 459/745 (62%)   control = 759/1255 (60%)</span></span>
+<span><span class="co">#&gt;   ATE estimate: -0.0211</span></span>
+<span><span class="co">#&gt;   ESS: treated = 492/745 (66%)   control = 819/1255 (65%)</span></span>
 <span><span class="co">#&gt; -------------------------------------------------- </span></span>
 <span><span class="co">#&gt; Use summary() for covariate balance details.</span></span></code></pre></div>
 <p>To manually set the leaf size:</p>
@@ -350,11 +352,12 @@ kernel):</p>
 <span><span class="co">#&gt; -------------------------------------------------- </span></span>
 <span><span class="co">#&gt;   n = 2,000  (n_treated = 745, n_control = 1255)</span></span>
 <span><span class="co">#&gt;   Trees: 1000</span></span>
+<span><span class="co">#&gt;   Estimand: ATE</span></span>
 <span><span class="co">#&gt;   Cross-fitting: 2 folds</span></span>
 <span><span class="co">#&gt;   Solver: direct</span></span>
-<span><span class="co">#&gt;   ATE estimate: -0.0784</span></span>
-<span><span class="co">#&gt;   Fold ATEs: -0.0918, -0.065</span></span>
-<span><span class="co">#&gt;   ESS: treated = 424/745 (57%)   control = 739/1255 (59%)</span></span>
+<span><span class="co">#&gt;   ATE estimate: -0.0608</span></span>
+<span><span class="co">#&gt;   Fold ATEs: -0.0556, -0.0659</span></span>
+<span><span class="co">#&gt;   ESS: treated = 539/745 (72%)   control = 930/1255 (74%)</span></span>
 <span><span class="co">#&gt; -------------------------------------------------- </span></span>
 <span><span class="co">#&gt; Use summary() for covariate balance details.</span></span></code></pre></div>
 </div>
@@ -394,27 +397,27 @@ size).</caption>
 <tbody>
 <tr class="odd">
 <td align="right">2</td>
-<td align="right">0.0907</td>
-<td align="right">0.0456</td>
-<td align="right">0.1015</td>
+<td align="right">0.0940</td>
+<td align="right">0.0436</td>
+<td align="right">0.1036</td>
 </tr>
 <tr class="even">
 <td align="right">3</td>
-<td align="right">0.0246</td>
-<td align="right">0.0275</td>
-<td align="right">0.0369</td>
+<td align="right">0.0355</td>
+<td align="right">0.0235</td>
+<td align="right">0.0426</td>
 </tr>
 <tr class="odd">
 <td align="right">5</td>
-<td align="right">0.1025</td>
-<td align="right">0.0096</td>
-<td align="right">0.1030</td>
+<td align="right">0.1174</td>
+<td align="right">0.0069</td>
+<td align="right">0.1176</td>
 </tr>
 <tr class="even">
 <td align="right">10</td>
-<td align="right">0.2065</td>
-<td align="right">0.1269</td>
-<td align="right">0.2424</td>
+<td align="right">0.2355</td>
+<td align="right">0.1246</td>
+<td align="right">0.2665</td>
 </tr>
 </tbody>
 </table>

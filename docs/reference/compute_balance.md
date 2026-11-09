@@ -138,12 +138,12 @@ bal
 #> Covariate Balance Diagnostics
 #>   n = 500  (n_treated = 259, n_control = 241)
 #> ------------------------------------------------------------ 
-#>   ESS (treated):  75.1%
-#>   ESS (control):  73.5%
-#>   Energy distance: 0.0210
+#>   ESS (treated):  82.8%
+#>   ESS (control):  82.4%
+#>   Energy distance: 0.0202
 #> 
 #>   |SMD| for covariates (10 features):
-#>     median = 0.0308   Q75 = 0.0405   Q90 = 0.0515   max = 0.0571
+#>     median = 0.0315   Q75 = 0.0475   Q90 = 0.0520   max = 0.0557
 #>     All |SMD| below 0.10
 #> ------------------------------------------------------------ 
 
@@ -155,16 +155,16 @@ bal2
 #> Covariate Balance Diagnostics
 #>   n = 500  (n_treated = 259, n_control = 241)
 #> ------------------------------------------------------------ 
-#>   ESS (treated):  75.1%
-#>   ESS (control):  73.5%
-#>   Energy distance: 0.0210
+#>   ESS (treated):  82.8%
+#>   ESS (control):  82.4%
+#>   Energy distance: 0.0202
 #> 
 #>   |SMD| for covariates (10 features):
-#>     median = 0.0308   Q75 = 0.0405   Q90 = 0.0515   max = 0.0571
+#>     median = 0.0315   Q75 = 0.0475   Q90 = 0.0520   max = 0.0557
 #>     All |SMD| below 0.10
 #> 
 #>   |SMD| for transformed covariates (2 features):
-#>     median = 0.0436   Q75 = 0.0533   Q90 = 0.0591   max = 0.0629
+#>     median = 0.0295   Q75 = 0.0306   Q90 = 0.0313   max = 0.0318
 #>     All |SMD| below 0.10
 #> ------------------------------------------------------------ 
 # }
